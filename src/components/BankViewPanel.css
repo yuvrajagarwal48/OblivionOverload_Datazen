@@ -1,0 +1,339 @@
+/* ─── Bank View Tab Toggle ─── */
+.bank-view-tab {
+  position: fixed;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  padding: 12px 8px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-right: none;
+  border-radius: 8px 0 0 8px;
+  color: #64748b;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  z-index: 20;
+  transition: all 0.2s ease;
+}
+
+.bank-view-tab:hover {
+  color: #0f172a;
+  background: #f8fafc;
+}
+
+.bank-view-tab.open {
+  right: 340px;
+  color: #3b82f6;
+}
+
+/* ─── Bank View Panel ─── */
+.bank-view-panel {
+  position: fixed;
+  top: 0;
+  right: -340px;
+  width: 340px;
+  height: 100vh;
+  background: #ffffff;
+  border-left: 1px solid #e2e8f0;
+  overflow-y: auto;
+  z-index: 15;
+  transition: right 0.3s ease;
+  padding-bottom: 80px;
+}
+
+.bank-view-panel.open {
+  right: 0;
+}
+
+.bank-view-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 20px 10px;
+  position: sticky;
+  top: 0;
+  background: #ffffff;
+  z-index: 2;
+  border-bottom: 1px solid #e2e8f0;
+  margin-bottom: 10px;
+}
+
+.bank-view-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+}
+
+.bank-clear-btn {
+  padding: 4px 10px;
+  background: transparent;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  color: #64748b;
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.bank-clear-btn:hover {
+  border-color: #ef4444;
+  color: #ef4444;
+}
+
+/* Empty state */
+.bank-view-empty {
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.bank-view-empty p {
+  color: #64748b;
+  font-size: 13px;
+  margin: 0 0 4px;
+}
+
+.bank-view-hint {
+  color: #94a3b8 !important;
+  font-size: 12px !important;
+}
+
+/* ─── Bank Cards ─── */
+.bank-cards-list {
+  padding: 0 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.bank-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 14px;
+  transition: border-color 0.2s ease;
+}
+
+.bank-card:hover {
+  border-color: #cbd5e1;
+}
+
+.bank-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.bank-card-id {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 14px;
+  color: #0f172a;
+}
+
+.bank-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.bank-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bank-tier {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.tier-1 {
+  background: rgba(59, 130, 246, 0.12);
+  color: #3b82f6;
+}
+
+.tier-2 {
+  background: rgba(245, 158, 11, 0.12);
+  color: #f59e0b;
+}
+
+.tier-3 {
+  background: rgba(100, 116, 139, 0.12);
+  color: #64748b;
+}
+
+.bank-remove-btn {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: #94a3b8;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.15s ease;
+}
+
+.bank-remove-btn:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+/* ─── Bank Metrics ─── */
+.bank-metrics {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.bank-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.bank-metric-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.bank-metric-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.bank-metric-value {
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  min-width: 52px;
+}
+
+.mini-bar-track {
+  flex: 1;
+  height: 4px;
+  background: #f1f5f9;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.mini-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.4s ease, background 0.3s ease;
+}
+
+.bank-status-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border: 1px solid;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: capitalize;
+  width: fit-content;
+}
+
+/* ─── Sparklines ─── */
+.bank-sparkline-container {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sparkline-svg {
+  width: 100%;
+  height: 32px;
+  display: block;
+}
+
+/* ─── Comparison Table ─── */
+.comparison-section {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.comparison-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 12px;
+}
+
+.comparison-table-wrapper {
+  overflow-x: auto;
+}
+
+.comparison-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.comparison-table th,
+.comparison-table td {
+  padding: 6px 10px;
+  text-align: left;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.comparison-table th {
+  color: #64748b;
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.comparison-table td {
+  color: #1e293b;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.comparison-table tr:last-child td {
+  border-bottom: none;
+}
+
+/* Scrollbar */
+.bank-view-panel::-webkit-scrollbar {
+  width: 6px;
+}
+
+.bank-view-panel::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.bank-view-panel::-webkit-scrollbar-thumb {
+  background: #e2e8f0;
+  border-radius: 3px;
+}
+
+.bank-view-panel::-webkit-scrollbar-thumb:hover {
+  background: #cbd5e1;
+}

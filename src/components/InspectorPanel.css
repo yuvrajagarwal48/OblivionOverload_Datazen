@@ -1,0 +1,345 @@
+/* ═══════════════════════════════════════════════
+   InspectorPanel — compact dark right panel
+   ═══════════════════════════════════════════════ */
+.inspector-panel {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.inspector-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.inspector-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #e2e8f0;
+  margin: 0;
+  letter-spacing: 0;
+}
+
+.inspector-clear-btn {
+  padding: 4px 10px;
+  background: transparent;
+  border: 1px solid #334155;
+  border-radius: 4px;
+  color: #64748b;
+  font-size: 11px;
+  font-family: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.inspector-clear-btn:hover:not(:disabled) {
+  border-color: #ef4444;
+  color: #f87171;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.inspector-clear-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* Sections */
+.inspector-section {
+  background: rgba(15, 23, 42, 0.5);
+  border: 1px solid #1e293b;
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.inspector-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #94a3b8;
+  margin: 0 0 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #1e293b;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+/* Selected Banks Grid — vertical in narrow panel */
+.selected-banks-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.inspector-bank-card {
+  background: rgba(30, 41, 59, 0.5);
+  border: 1px solid #334155;
+  border-radius: 6px;
+  padding: 10px 12px;
+  transition: all 0.15s ease;
+}
+
+.inspector-bank-card.selected {
+  border-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.08);
+  box-shadow: none;
+}
+
+.bank-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.bank-card-id {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  font-size: 13px;
+  color: #e2e8f0;
+}
+
+.bank-status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.bank-status-dot.status-active {
+  background: #10b981;
+}
+
+.bank-status-dot.status-defaulted {
+  background: #94a3b8;
+}
+
+.bank-deselect-btn {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  color: #475569;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.15s ease;
+}
+
+.bank-deselect-btn:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+}
+
+/* Tier Badge */
+.bank-tier-badge {
+  margin-bottom: 12px;
+}
+
+.tier-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.tier-badge.tier-1 {
+  background: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+}
+
+.tier-badge.tier-2 {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+}
+
+.tier-badge.tier-3 {
+  background: rgba(100, 116, 139, 0.15);
+  color: #64748b;
+}
+
+/* Bank Metrics */
+.bank-metrics {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.bank-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.bank-metric-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.bank-metric-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.bank-metric-value {
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  min-width: 44px;
+}
+
+.mini-bar-track {
+  flex: 1;
+  height: 4px;
+  background: #1e293b;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.mini-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.4s ease, background 0.3s ease;
+}
+
+.bank-status-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border: 1px solid;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: capitalize;
+  width: fit-content;
+}
+
+.bank-status-badge.status-active {
+  background: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+  border-color: #10b981;
+}
+
+.bank-status-badge.status-defaulted {
+  background: rgba(148, 163, 184, 0.1);
+  color: #94a3b8;
+  border-color: #cbd5e1;
+}
+
+/* Sparkline */
+.bank-sparkline-container {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #1e293b;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sparkline-svg {
+  width: 100%;
+  height: 32px;
+  display: block;
+}
+
+/* Banks List */
+.banks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.inspector-bank-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.inspector-bank-item:hover {
+  border-color: #334155;
+  background: rgba(30, 41, 59, 0.5);
+}
+
+.inspector-bank-item.selected {
+  border-color: rgba(59, 130, 246, 0.3);
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.bank-item-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bank-item-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #cbd5e1;
+}
+
+.bank-item-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.bank-item-ratio {
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.bank-item-stress {
+  font-size: 11px;
+  color: #475569;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Empty State */
+.inspector-empty {
+  padding: 30px 12px;
+  text-align: center;
+  color: #475569;
+  font-size: 12px;
+}
+
+/* Scrollbar */
+.inspector-panel::-webkit-scrollbar {
+  width: 4px;
+}
+
+.inspector-panel::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.inspector-panel::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 2px;
+}
+
+.inspector-panel::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}

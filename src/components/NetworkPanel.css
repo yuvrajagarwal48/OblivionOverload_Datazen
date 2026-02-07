@@ -1,0 +1,25 @@
+.network-panel {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 60px);
+  background: #f8fafc;
+}
+
+.network-view {
+  flex: 1;
+  padding: 24px;
+  overflow: hidden;
+}
+
+.network-view .network-graph-container {
+  height: 100%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.network-controls {
+  position: sticky;
+  bottom: 0;
+  background: #ffffff;
+  border-top: 1px solid #e2e8f0;
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.05);
+}

@@ -1,0 +1,132 @@
+/* ═══════════════════════════════════════════════
+   SystemHealthPanel — dark sidebar adaptation
+   ═══════════════════════════════════════════════ */
+.health-panel {
+  padding: 0;
+}
+
+.health-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.health-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #e2e8f0;
+  margin: 0;
+}
+
+.health-step {
+  font-size: 10px;
+  color: #60a5fa;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  padding: 2px 8px;
+  background: rgba(59, 130, 246, 0.1);
+  border-radius: 4px;
+  border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.health-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.health-card {
+  padding: 12px 14px;
+  background: rgba(15, 23, 42, 0.5);
+  border: 1px solid #1e293b;
+  border-radius: 8px;
+  transition: all 0.15s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.health-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 3px;
+  height: 100%;
+  border-radius: 3px 0 0 3px;
+}
+
+.health-card:hover {
+  background: rgba(30, 41, 59, 0.6);
+  box-shadow: none;
+  transform: none;
+}
+
+.health-card-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.health-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.health-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.health-value {
+  font-size: 20px;
+  font-weight: 800;
+  color: #f1f5f9;
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 8px;
+  letter-spacing: -0.5px;
+}
+
+/* Progress bar */
+.health-bar-track {
+  height: 3px;
+  background: rgba(51, 65, 85, 0.5);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.health-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.4s ease, background-color 0.3s ease;
+}
+
+/* Severity colors — keep accent colors, adapt backgrounds for dark */
+.severity-good::before { background: linear-gradient(180deg, #10b981, #059669); }
+.severity-good .health-icon { background: rgba(16, 185, 129, 0.15); color: #34d399; }
+.severity-good .health-value { color: #34d399; }
+.severity-good .health-bar-fill { background: linear-gradient(90deg, #10b981, #34d399); }
+
+.severity-warning::before { background: linear-gradient(180deg, #f59e0b, #d97706); }
+.severity-warning .health-icon { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
+.severity-warning .health-value { color: #fbbf24; }
+.severity-warning .health-bar-fill { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+
+.severity-critical::before { background: linear-gradient(180deg, #ef4444, #dc2626); }
+.severity-critical .health-icon { background: rgba(239, 68, 68, 0.15); color: #f87171; }
+.severity-critical .health-value { color: #f87171; }
+.severity-critical .health-bar-fill { background: linear-gradient(90deg, #ef4444, #f87171); }
+
+.severity-neutral::before { background: linear-gradient(180deg, #64748b, #475569); }
+.severity-neutral .health-icon { background: rgba(100, 116, 139, 0.15); color: #94a3b8; }
+.severity-neutral .health-value { color: #94a3b8; }
+.severity-neutral .health-bar-fill { background: #64748b; }

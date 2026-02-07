@@ -1,0 +1,54 @@
+/* ═══════════════════════════════════════════════
+   ActivityBar — VS Code style vertical icon bar
+   ═══════════════════════════════════════════════ */
+
+.activity-bar {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  width: 48px;
+  background: #1e293b;
+  border-right: 1px solid #334155;
+  flex-shrink: 0;
+}
+
+.activity-top,
+.activity-bottom {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4px 0;
+}
+
+.activity-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  background: transparent;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  position: relative;
+  transition: color 0.15s ease;
+}
+
+.activity-btn:hover {
+  color: #cbd5e1;
+}
+
+.activity-btn.active {
+  color: #f8fafc;
+}
+
+.activity-btn.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 2px;
+  background: #3b82f6;
+  border-radius: 0 2px 2px 0;
+}
