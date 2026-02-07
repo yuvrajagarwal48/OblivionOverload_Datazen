@@ -823,3 +823,334 @@ def print_simulation_summary(final_stats, market_state, total_rewards: dict,
             print(f"  │ SIBs:            {risk_report.systemically_important_banks}")
     
     print("\n" + "═" * 70 + "\n")
+
+
+class InfrastructureVisualizer:
+    """Visualize infrastructure nodes (exchanges, CCPs) and transaction flows."""
+    
+    def __init__(self, save_dir: str = "outputs/figures"):
+        self.save_dir = Path(save_dir)
+        self.save_dir.mkdir(parents=True, exist_ok=True)
+    
+    def plot_infrastructure_network(self,
+                                     exchanges: List[Any],
+                                     ccps: List[Any],
+                                     banks: Dict[int, Any],
+                                     router: Optional[Any] = None,
+                                     save: bool = True,
+                                     show: bool = True) -> plt.Figure:
+        """
+        Plot the full infrastructure network with exchanges, CCPs, and banks.
+        """
+        fig, ax = plt.subplots(1, 1, figsize=(14, 10))
+        
+        # Create graph
+        G = nx.DiGraph()
+        
+        # Add bank nodes
+        bank_ids = list(banks.keys())
+        for bank_id in bank_ids:
+            G.add_node(f"B{bank_id}", node_type='bank')
+        
+        # Add exchange nodes
+        for i, exchange in enumerate(exchanges):
+            G.add_node(f"EX{i}", node_type='exchange')
+            # Connect banks to exchanges
+            for bank_id in bank_ids[:len(bank_ids)//2]:  # First half to first exchange
+                G.add_edge(f"B{bank_id}", f"EX{i}", edge_type='order')
+        
+        # Add CCP nodes
+        for i, ccp in enumerate(ccps):
+            G.add_node(f"CCP{i}", node_type='ccp')
+            # Connect exchanges to CCPs
+            for j in range(len(exchanges)):
+                G.add_edge(f"EX{j}", f"CCP{i}", edge_type='clearing')
+            # Connect CCPs to banks
+            for bank_id in bank_ids:
+                G.add_edge(f"CCP{i}", f"B{bank_id}", edge_type='settlement')
+        
+        # Layout
+        pos = {}
+        
+        # Banks in outer circle
+        n_banks = len(bank_ids)
+        for i, bank_id in enumerate(bank_ids):
+            angle = 2 * np.pi * i / n_banks
+            pos[f"B{bank_id}"] = (3 * np.cos(angle), 3 * np.sin(angle))
+        
+        # Exchanges in inner circle (left side)
+        n_ex = len(exchanges)
+        for i in range(n_ex):
+            angle = np.pi/2 + np.pi * i / max(n_ex - 1, 1)
+            pos[f"EX{i}"] = (1.5 * np.cos(angle), 1.5 * np.sin(angle))
+        
+        # CCPs in center
+        n_ccp = len(ccps)
+        for i in range(n_ccp):
+            pos[f"CCP{i}"] = (0, 0.5 * i - 0.25 * n_ccp)
+        
+        # Draw edges
+        edge_colors = []
+        edge_styles = []
+        for u, v, data in G.edges(data=True):
+            if data.get('edge_type') == 'order':
+                edge_colors.append('#3498db')
+                edge_styles.append('solid')
+            elif data.get('edge_type') == 'clearing':
+                edge_colors.append('#e74c3c')
+                edge_styles.append('dashed')
+            else:
+                edge_colors.append('#27ae60')
+                edge_styles.append('dotted')
+        
+        nx.draw_networkx_edges(G, pos, ax=ax, edge_color=edge_colors, 
+                                alpha=0.5, arrows=True, arrowsize=15)
+        
+        # Draw nodes by type
+        bank_nodes = [n for n in G.nodes() if G.nodes[n].get('node_type') == 'bank']
+        exchange_nodes = [n for n in G.nodes() if G.nodes[n].get('node_type') == 'exchange']
+        ccp_nodes = [n for n in G.nodes() if G.nodes[n].get('node_type') == 'ccp']
+        
+        nx.draw_networkx_nodes(G, pos, nodelist=bank_nodes, ax=ax,
+                                node_color='#3498db', node_size=400, 
+                                node_shape='o', label='Banks')
+        nx.draw_networkx_nodes(G, pos, nodelist=exchange_nodes, ax=ax,
+                                node_color='#e74c3c', node_size=800,
+                                node_shape='s', label='Exchanges')
+        nx.draw_networkx_nodes(G, pos, nodelist=ccp_nodes, ax=ax,
+                                node_color='#27ae60', node_size=1000,
+                                node_shape='^', label='CCPs')
+        
+        # Labels
+        nx.draw_networkx_labels(G, pos, ax=ax, font_size=8)
+        
+        ax.set_title('Financial Infrastructure Network', fontsize=14, fontweight='bold')
+        ax.legend(loc='upper right')
+        ax.axis('off')
+        
+        plt.tight_layout()
+        
+        if save:
+            fig.savefig(self.save_dir / 'infrastructure_network.png', dpi=150, bbox_inches='tight')
+        
+        if show:
+            plt.show()
+        else:
+            plt.close(fig)
+        
+        return fig
+    
+    def plot_transaction_flow(self,
+                               router: Any,
+                               time_window: int = 50,
+                               save: bool = True,
+                               show: bool = True) -> plt.Figure:
+        """
+        Plot transaction flow through infrastructure over time.
+        """
+        fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+        
+        # Get transaction history from router
+        history = getattr(router, 'transaction_history', [])
+        
+        if not history:
+            # Create dummy data for demonstration
+            steps = list(range(time_window))
+            volumes = np.cumsum(np.random.randn(time_window) * 100 + 500)
+            congestion = np.random.random(time_window) * 0.5
+            delays = np.random.exponential(1, time_window)
+            fees = congestion * 0.02
+        else:
+            recent = history[-time_window:]
+            steps = list(range(len(recent)))
+            volumes = [t.get('amount', 0) for t in recent]
+            congestion = [t.get('congestion', 0) for t in recent]
+            delays = [t.get('delay', 0) for t in recent]
+            fees = [t.get('fee', 0) for t in recent]
+        
+        # Plot 1: Transaction Volume
+        ax1 = axes[0, 0]
+        ax1.fill_between(steps, 0, volumes, alpha=0.3, color='blue')
+        ax1.plot(steps, volumes, color='blue', linewidth=2)
+        ax1.set_title('Transaction Volume Over Time')
+        ax1.set_xlabel('Step')
+        ax1.set_ylabel('Volume')
+        ax1.grid(True, alpha=0.3)
+        
+        # Plot 2: Exchange Congestion
+        ax2 = axes[0, 1]
+        ax2.bar(steps, congestion, color='red', alpha=0.6)
+        ax2.axhline(y=0.5, color='orange', linestyle='--', label='Warning Level')
+        ax2.set_title('Exchange Congestion')
+        ax2.set_xlabel('Step')
+        ax2.set_ylabel('Congestion Level')
+        ax2.legend()
+        ax2.grid(True, alpha=0.3)
+        
+        # Plot 3: Settlement Delays
+        ax3 = axes[1, 0]
+        ax3.scatter(steps, delays, alpha=0.6, c=delays, cmap='Reds', s=50)
+        ax3.axhline(y=np.mean(delays), color='blue', linestyle='-', label=f'Mean: {np.mean(delays):.2f}')
+        ax3.set_title('Settlement Delays')
+        ax3.set_xlabel('Step')
+        ax3.set_ylabel('Delay (steps)')
+        ax3.legend()
+        ax3.grid(True, alpha=0.3)
+        
+        # Plot 4: Transaction Fees
+        ax4 = axes[1, 1]
+        ax4.plot(steps, fees, color='green', linewidth=2)
+        ax4.fill_between(steps, 0, fees, alpha=0.3, color='green')
+        ax4.set_title('Infrastructure Fees')
+        ax4.set_xlabel('Step')
+        ax4.set_ylabel('Fee Rate')
+        ax4.grid(True, alpha=0.3)
+        
+        fig.suptitle('Transaction Flow Through Infrastructure', fontsize=14, fontweight='bold')
+        plt.tight_layout()
+        
+        if save:
+            fig.savefig(self.save_dir / 'transaction_flow.png', dpi=150, bbox_inches='tight')
+        
+        if show:
+            plt.show()
+        else:
+            plt.close(fig)
+        
+        return fig
+    
+    def plot_ccp_waterfall(self,
+                            waterfall_results: List[Any],
+                            save: bool = True,
+                            show: bool = True) -> plt.Figure:
+        """
+        Visualize CCP default waterfall mechanism.
+        """
+        if not waterfall_results:
+            # Demo data
+            waterfall_results = [{
+                'defaulter': 0,
+                'total_loss': 1000000,
+                'layers': {
+                    'member_margin': 600000,
+                    'default_fund': 250000,
+                    'ccp_capital': 100000,
+                    'mutualized': 50000
+                }
+            }]
+        
+        fig, ax = plt.subplots(1, 1, figsize=(12, 8))
+        
+        # Aggregate results
+        total_losses = sum(r.get('total_loss', 0) for r in waterfall_results)
+        
+        layer_names = ['Member Margin', 'Default Fund', 'CCP Capital', 'Mutualized']
+        layer_keys = ['member_margin', 'default_fund', 'ccp_capital', 'mutualized']
+        colors = ['#3498db', '#2ecc71', '#f39c12', '#e74c3c']
+        
+        layer_amounts = []
+        for key in layer_keys:
+            amount = sum(r.get('layers', {}).get(key, 0) for r in waterfall_results)
+            layer_amounts.append(amount)
+        
+        # Waterfall chart
+        cumulative = 0
+        for i, (name, amount, color) in enumerate(zip(layer_names, layer_amounts, colors)):
+            ax.barh(0, amount, left=cumulative, color=color, label=name, height=0.5)
+            
+            # Add amount label
+            if amount > 0:
+                ax.text(cumulative + amount/2, 0, f'{amount/1e6:.2f}M', 
+                        ha='center', va='center', fontsize=10, fontweight='bold', color='white')
+            
+            cumulative += amount
+        
+        ax.axvline(x=total_losses, color='red', linestyle='--', linewidth=2, label='Total Loss')
+        
+        ax.set_xlim(0, max(cumulative * 1.1, total_losses * 1.1))
+        ax.set_yticks([])
+        ax.set_xlabel('Amount', fontsize=12)
+        ax.set_title('CCP Default Waterfall - Loss Absorption', fontsize=14, fontweight='bold')
+        ax.legend(loc='upper right')
+        
+        plt.tight_layout()
+        
+        if save:
+            fig.savefig(self.save_dir / 'ccp_waterfall.png', dpi=150, bbox_inches='tight')
+        
+        if show:
+            plt.show()
+        else:
+            plt.close(fig)
+        
+        return fig
+    
+    def plot_margin_status(self,
+                            ccp: Any,
+                            save: bool = True,
+                            show: bool = True) -> plt.Figure:
+        """
+        Plot margin account status for CCP members.
+        """
+        fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+        
+        # Get margin data
+        if hasattr(ccp, 'margin_accounts'):
+            members = list(ccp.margin_accounts.keys())
+            initial_margins = [ccp.margin_accounts[m].initial_margin for m in members]
+            variation_margins = [ccp.margin_accounts[m].variation_margin for m in members]
+            collateral = [ccp.margin_accounts[m].collateral_posted for m in members]
+            default_fund = [ccp.margin_accounts[m].default_fund_contribution for m in members]
+        else:
+            # Demo data
+            members = list(range(10))
+            initial_margins = np.random.uniform(50000, 200000, 10)
+            variation_margins = np.random.uniform(-20000, 20000, 10)
+            collateral = initial_margins + np.random.uniform(10000, 50000, 10)
+            default_fund = np.random.uniform(10000, 50000, 10)
+        
+        # Plot 1: Margin Requirements vs Collateral
+        ax1 = axes[0]
+        x = np.arange(len(members))
+        width = 0.35
+        
+        ax1.bar(x - width/2, initial_margins, width, label='Initial Margin', color='#3498db')
+        ax1.bar(x + width/2, collateral, width, label='Collateral Posted', color='#2ecc71')
+        
+        # Highlight shortfalls
+        for i, (im, col) in enumerate(zip(initial_margins, collateral)):
+            if col < im:
+                ax1.scatter(i, max(im, col), marker='v', color='red', s=100, zorder=5)
+        
+        ax1.set_xlabel('Member ID')
+        ax1.set_ylabel('Amount')
+        ax1.set_title('Initial Margin vs Collateral')
+        ax1.set_xticks(x)
+        ax1.set_xticklabels([f'M{m}' for m in members], rotation=45)
+        ax1.legend()
+        ax1.grid(True, alpha=0.3, axis='y')
+        
+        # Plot 2: Variation Margin (P&L)
+        ax2 = axes[1]
+        colors = ['#e74c3c' if vm < 0 else '#2ecc71' for vm in variation_margins]
+        ax2.bar(x, variation_margins, color=colors)
+        ax2.axhline(y=0, color='black', linestyle='-', linewidth=1)
+        ax2.set_xlabel('Member ID')
+        ax2.set_ylabel('Variation Margin (P&L)')
+        ax2.set_title('Daily P&L by Member')
+        ax2.set_xticks(x)
+        ax2.set_xticklabels([f'M{m}' for m in members], rotation=45)
+        ax2.grid(True, alpha=0.3, axis='y')
+        
+        fig.suptitle('CCP Margin Status', fontsize=14, fontweight='bold')
+        plt.tight_layout()
+        
+        if save:
+            fig.savefig(self.save_dir / 'margin_status.png', dpi=150, bbox_inches='tight')
+        
+        if show:
+            plt.show()
+        else:
+            plt.close(fig)
+        
+        return fig
