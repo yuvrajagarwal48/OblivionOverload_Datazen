@@ -19,7 +19,7 @@
 .inspector-title {
   font-size: 13px;
   font-weight: 700;
-  color: #e2e8f0;
+  color: var(--text-primary);
   margin: 0;
   letter-spacing: 0;
 }
@@ -27,9 +27,9 @@
 .inspector-clear-btn {
   padding: 4px 10px;
   background: transparent;
-  border: 1px solid #334155;
+  border: 1px solid var(--border-secondary);
   border-radius: 4px;
-  color: #64748b;
+  color: var(--text-tertiary);
   font-size: 11px;
   font-family: inherit;
   font-weight: 600;
@@ -50,8 +50,8 @@
 
 /* Sections */
 .inspector-section {
-  background: rgba(15, 23, 42, 0.5);
-  border: 1px solid #1e293b;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
   border-radius: 8px;
   padding: 12px;
   box-shadow: none;
@@ -61,10 +61,10 @@
 .inspector-section-title {
   font-size: 11px;
   font-weight: 700;
-  color: #94a3b8;
+  color: var(--text-tertiary);
   margin: 0 0 10px;
   padding-bottom: 8px;
-  border-bottom: 1px solid #1e293b;
+  border-bottom: 1px solid var(--border-primary);
   letter-spacing: 0.5px;
   text-transform: uppercase;
 }
@@ -77,8 +77,8 @@
 }
 
 .inspector-bank-card {
-  background: rgba(30, 41, 59, 0.5);
-  border: 1px solid #334155;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-secondary);
   border-radius: 6px;
   padding: 10px 12px;
   transition: all 0.15s ease;
@@ -103,7 +103,7 @@
   gap: 6px;
   font-weight: 700;
   font-size: 13px;
-  color: #e2e8f0;
+  color: var(--text-primary);
 }
 
 .bank-status-dot {
@@ -130,7 +130,7 @@
   background: transparent;
   border: none;
   border-radius: 3px;
-  color: #475569;
+  color: var(--text-muted);
   font-size: 14px;
   cursor: pointer;
   padding: 0;
@@ -169,7 +169,7 @@
 
 .tier-badge.tier-3 {
   background: rgba(100, 116, 139, 0.15);
-  color: #64748b;
+  color: var(--text-tertiary);
 }
 
 /* Bank Metrics */
@@ -188,7 +188,7 @@
 .bank-metric-label {
   font-size: 11px;
   font-weight: 600;
-  color: #64748b;
+  color: var(--text-tertiary);
   text-transform: uppercase;
   letter-spacing: 0.4px;
 }
@@ -209,7 +209,7 @@
 .mini-bar-track {
   flex: 1;
   height: 4px;
-  background: #1e293b;
+  background: var(--bg-secondary);
   border-radius: 2px;
   overflow: hidden;
 }
@@ -239,15 +239,15 @@
 
 .bank-status-badge.status-defaulted {
   background: rgba(148, 163, 184, 0.1);
-  color: #94a3b8;
-  border-color: #cbd5e1;
+  color: var(--text-tertiary);
+  border-color: var(--text-secondary);
 }
 
 /* Sparkline */
 .bank-sparkline-container {
   margin-top: 8px;
   padding-top: 8px;
-  border-top: 1px solid #1e293b;
+  border-top: 1px solid var(--border-primary);
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -279,8 +279,8 @@
 }
 
 .inspector-bank-item:hover {
-  border-color: #334155;
-  background: rgba(30, 41, 59, 0.5);
+  border-color: var(--border-secondary);
+  background: var(--bg-secondary);
 }
 
 .inspector-bank-item.selected {
@@ -297,7 +297,7 @@
 .bank-item-label {
   font-size: 12px;
   font-weight: 600;
-  color: #cbd5e1;
+  color: var(--text-secondary);
 }
 
 .bank-item-right {
@@ -314,7 +314,7 @@
 
 .bank-item-stress {
   font-size: 11px;
-  color: #475569;
+  color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
 
@@ -322,7 +322,7 @@
 .inspector-empty {
   padding: 30px 12px;
   text-align: center;
-  color: #475569;
+  color: var(--text-muted);
   font-size: 12px;
 }
 
@@ -336,10 +336,10 @@
 }
 
 .inspector-panel::-webkit-scrollbar-thumb {
-  background: #334155;
+  background: var(--bg-tertiary);
   border-radius: 2px;
 }
 
 .inspector-panel::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+  background: var(--scrollbar-thumb-hover);
 }

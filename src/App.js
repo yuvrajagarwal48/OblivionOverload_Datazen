@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import useSimulationStore from './store/simulationStore';
 import useWebSocket from './hooks/useWebSocket';
 import LoginPage from './components/LoginPage';
@@ -43,12 +43,62 @@ function App() {
   const logout = useSimulationStore((s) => s?.logout);
   const apiLoading = useSimulationStore((s) => s?.apiLoading ?? false);
   const apiError = useSimulationStore((s) => s?.apiError);
+  const panelSizes = useSimulationStore((s) => s?.panelSizes || { leftSidebar: 280, rightPanel: 300, bottomPanel: 220 });
+  const setPanelSize = useSimulationStore((s) => s?.setPanelSize);
 
   const [activeSidebar, setActiveSidebar] = useState('config');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
   const [bottomPanelOpen, setBottomPanelOpen] = useState(true);
   const [bottomTab, setBottomTab] = useState('activity'); // 'activity' | 'events' | 'risk' | 'market'
+  
+  // Resize state
+  const [resizing, setResizing] = useState(null);
+  const resizeStartRef = useRef({ x: 0, y: 0, size: 0 });
+
+  const handleResizeStart = useCallback((panel, e) => {
+    e.preventDefault();
+    setResizing(panel);
+    resizeStartRef.current = {
+      x: e.clientX,
+      y: e.clientY,
+      size: panelSizes[panel],
+    };
+  }, [panelSizes]);
+
+  const handleResizeMove = useCallback((e) => {
+    if (!resizing) return;
+    
+    const { x, y, size } = resizeStartRef.current;
+    let newSize;
+    
+    if (resizing === 'leftSidebar') {
+      newSize = Math.max(220, Math.min(500, size + (e.clientX - x)));
+      setPanelSize('leftSidebar', newSize);
+    } else if (resizing === 'rightPanel') {
+      newSize = Math.max(240, Math.min(600, size - (e.clientX - x)));
+      setPanelSize('rightPanel', newSize);
+    } else if (resizing === 'bottomPanel') {
+      newSize = Math.max(120, Math.min(window.innerHeight * 0.6, size - (e.clientY - y)));
+      setPanelSize('bottomPanel', newSize);
+    }
+  }, [resizing, setPanelSize]);
+
+  const handleResizeEnd = useCallback(() => {
+    setResizing(null);
+  }, []);
+
+  // Attach global mouse handlers during resize
+  React.useEffect(() => {
+    if (resizing) {
+      window.addEventListener('mousemove', handleResizeMove);
+      window.addEventListener('mouseup', handleResizeEnd);
+      return () => {
+        window.removeEventListener('mousemove', handleResizeMove);
+        window.removeEventListener('mouseup', handleResizeEnd);
+      };
+    }
+  }, [resizing, handleResizeMove, handleResizeEnd]);
 
   // Activate WebSocket connection management
   useWebSocket();
@@ -134,20 +184,26 @@ function App() {
 
         {/* Left Sidebar */}
         {sidebarOpen && (
-          <div className="ide-sidebar">
-            <div className="sidebar-header">
-              <span className="sidebar-title">
-                {activeSidebar === 'config' ? 'CONFIGURATION' : 'SYSTEM HEALTH'}
-              </span>
+          <>
+            <div className="ide-sidebar" style={{ width: `${panelSizes.leftSidebar}px` }}>
+              <div className="sidebar-header">
+                <span className="sidebar-title">
+                  {activeSidebar === 'config' ? 'CONFIGURATION' : 'SYSTEM HEALTH'}
+                </span>
+              </div>
+              <div className="sidebar-content">
+                {activeSidebar === 'config' ? (
+                  <ScenarioSelector />
+                ) : (
+                  <SystemHealthPanel />
+                )}
+              </div>
             </div>
-            <div className="sidebar-content">
-              {activeSidebar === 'config' ? (
-                <ScenarioSelector />
-              ) : (
-                <SystemHealthPanel />
-              )}
-            </div>
-          </div>
+            <div 
+              className="resize-handle-vertical"
+              onMouseDown={(e) => handleResizeStart('leftSidebar', e)}
+            />
+          </>
         )}
 
         {/* Center + Bottom */}
@@ -167,69 +223,81 @@ function App() {
 
           {/* Bottom Panel */}
           {bottomPanelOpen && (
-            <div className="ide-bottom-panel">
-              <div className="bottom-panel-tabs">
-                <button 
-                  className={`bottom-tab ${bottomTab === 'activity' ? 'active' : ''}`}
-                  onClick={() => setBottomTab('activity')}
-                >
-                  Activity Log
-                </button>
-                <button 
-                  className={`bottom-tab ${bottomTab === 'events' ? 'active' : ''}`}
-                  onClick={() => setBottomTab('events')}
-                >
-                  Events & Analytics
-                </button>
-                <button 
-                  className={`bottom-tab ${bottomTab === 'risk' ? 'active' : ''}`}
-                  onClick={() => setBottomTab('risk')}
-                >
-                  Risk Metrics
-                </button>
-                <button 
-                  className={`bottom-tab ${bottomTab === 'market' ? 'active' : ''}`}
-                  onClick={() => setBottomTab('market')}
-                >
-                  Market Data
-                </button>
+            <>
+              <div 
+                className="resize-handle-horizontal"
+                onMouseDown={(e) => handleResizeStart('bottomPanel', e)}
+              />
+              <div className="ide-bottom-panel" style={{ height: `${panelSizes.bottomPanel}px` }}>
+                <div className="bottom-panel-tabs">
+                  <button 
+                    className={`bottom-tab ${bottomTab === 'activity' ? 'active' : ''}`}
+                    onClick={() => setBottomTab('activity')}
+                  >
+                    Activity Log
+                  </button>
+                  <button 
+                    className={`bottom-tab ${bottomTab === 'events' ? 'active' : ''}`}
+                    onClick={() => setBottomTab('events')}
+                  >
+                    Events & Analytics
+                  </button>
+                  <button 
+                    className={`bottom-tab ${bottomTab === 'risk' ? 'active' : ''}`}
+                    onClick={() => setBottomTab('risk')}
+                  >
+                    Risk Metrics
+                  </button>
+                  <button 
+                    className={`bottom-tab ${bottomTab === 'market' ? 'active' : ''}`}
+                    onClick={() => setBottomTab('market')}
+                  >
+                    Market Data
+                  </button>
+                </div>
+                <div className="bottom-panel-content">
+                  {bottomTab === 'activity' && <ActivityLog />}
+                  {bottomTab === 'events' && <AnalyticsPanel />}
+                  {bottomTab === 'risk' && <RiskMetricsPanel />}
+                  {bottomTab === 'market' && <MarketDataPanel />}
+                </div>
               </div>
-              <div className="bottom-panel-content">
-                {bottomTab === 'activity' && <ActivityLog />}
-                {bottomTab === 'events' && <AnalyticsPanel />}
-                {bottomTab === 'risk' && <RiskMetricsPanel />}
-                {bottomTab === 'market' && <MarketDataPanel />}
-              </div>
-            </div>
+            </>
           )}
         </div>
 
         {/* Right Panel (Inspector or BankDashboard) */}
         {rightPanelOpen && (
-          <div className="ide-right-panel">
-            <div className="sidebar-header">
-              <span className="sidebar-title">
-                {restrictedMode ? 'MY BANK' : 'BANK INSPECTOR'}
-              </span>
-            </div>
-            <div className="sidebar-content">
-              {restrictedMode ? (
-                backendInitialized ? (
-                  <BankDashboard />
-                ) : (
-                  <div className="panel-uninitialized">
-                    <AlertCircle size={64} className="panel-uninitialized-icon" />
-                    <div className="panel-uninitialized-title">Simulation Not Initialized</div>
-                    <div className="panel-uninitialized-text">
-                      Please initialize the simulation from the Configuration panel to view your bank dashboard.
+          <>
+            <div 
+              className="resize-handle-vertical"
+              onMouseDown={(e) => handleResizeStart('rightPanel', e)}
+            />
+            <div className="ide-right-panel" style={{ width: `${panelSizes.rightPanel}px` }}>
+              <div className="sidebar-header">
+                <span className="sidebar-title">
+                  {restrictedMode ? 'MY BANK' : 'BANK INSPECTOR'}
+                </span>
+              </div>
+              <div className="sidebar-content">
+                {restrictedMode ? (
+                  backendInitialized ? (
+                    <BankDashboard />
+                  ) : (
+                    <div className="panel-uninitialized">
+                      <AlertCircle size={64} className="panel-uninitialized-icon" />
+                      <div className="panel-uninitialized-title">Simulation Not Initialized</div>
+                      <div className="panel-uninitialized-text">
+                        Please initialize the simulation from the Configuration panel to view your bank dashboard.
+                      </div>
                     </div>
-                  </div>
-                )
-              ) : (
-                <InspectorPanel />
-              )}
+                  )
+                ) : (
+                  <InspectorPanel />
+                )}
+              </div>
             </div>
-          </div>
+          </>
         )}
       </div>
     </div>

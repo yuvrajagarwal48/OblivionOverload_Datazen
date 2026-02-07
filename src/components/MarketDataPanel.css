@@ -9,7 +9,7 @@
   padding: 20px;
   height: 100%;
   overflow-y: auto;
-  background: #0f172a;
+  background: var(--bg-primary);
 }
 
 .market-header {
@@ -21,15 +21,15 @@
 .market-title {
   font-size: 18px;
   font-weight: 800;
-  color: #f1f5f9;
+  color: var(--text-primary);
   margin: 0;
 }
 
 .market-step {
   font-size: 11px;
   font-weight: 700;
-  color: #64748b;
-  background: #1e293b;
+  color: var(--text-tertiary);
+  background: var(--bg-secondary);
   padding: 4px 10px;
   border-radius: 4px;
   letter-spacing: 0.5px;
@@ -44,8 +44,8 @@
 
 .market-card {
   padding: 12px;
-  background: #1e293b;
-  border: 1px solid #334155;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-secondary);
   border-radius: 8px;
 }
 
@@ -54,7 +54,7 @@
   align-items: center;
   gap: 6px;
   margin-bottom: 8px;
-  color: #94a3b8;
+  color: var(--text-tertiary);
 }
 
 .market-card-label {
@@ -67,7 +67,7 @@
 .market-card-value {
   font-size: 18px;
   font-weight: 800;
-  color: #e2e8f0;
+  color: var(--text-primary);
   font-variant-numeric: tabular-nums;
 }
 
@@ -81,15 +81,15 @@
 .chart-section-title {
   font-size: 11px;
   font-weight: 700;
-  color: #94a3b8;
+  color: var(--text-tertiary);
   text-transform: uppercase;
   letter-spacing: 1px;
   margin: 0;
 }
 
 .chart-container {
-  background: #1e293b;
-  border: 1px solid #334155;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-secondary);
   border-radius: 10px;
   padding: 16px;
 }
@@ -98,7 +98,7 @@
 .market-empty {
   padding: 40px;
   text-align: center;
-  color: #475569;
+  color: var(--text-muted);
   font-size: 13px;
   font-style: italic;
 }
@@ -109,6 +109,6 @@
 }
 
 .market-data-panel::-webkit-scrollbar-thumb {
-  background: #334155;
+  background: var(--bg-tertiary);
   border-radius: 2px;
 }

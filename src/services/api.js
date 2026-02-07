@@ -42,7 +42,7 @@ const post = (path, body) =>
 /** POST /simulation/init — initialize environment + agents */
 export const initSimulation = (config = {}) =>
   post('/simulation/init', {
-    num_banks: config.num_banks ?? 30,
+    num_banks: config.num_banks ?? 5,
     episode_length: config.episode_length ?? 100,
     scenario: config.scenario ?? 'normal',
     seed: config.seed ?? null,

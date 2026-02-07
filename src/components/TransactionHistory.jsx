@@ -1,46 +1,56 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { History, RefreshCw, Check, X } from 'lucide-react';
-import { fetchTransactions } from '../lib/supabase';
+import React, { useMemo } from 'react';
+import { History, ArrowRightLeft, TrendingUp, TrendingDown, Link } from 'lucide-react';
 import useSimulationStore from '../store/simulationStore';
 import './TransactionHistory.css';
 
 /**
- * TransactionHistory — Shows Supabase-backed log of
- * all proposed transactions for the logged-in bank.
+ * TransactionHistory — Shows real-time edge activity from the graph.
+ * Displays lending, repayments, and new links involving the logged-in bank.
  */
 export default function TransactionHistory() {
   const currentBankId = useSimulationStore((s) => s.currentBankId);
-  const [transactions, setTransactions] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const activityLog = useSimulationStore((s) => s.activityLog || []);
 
-  const load = useCallback(async () => {
-    if (currentBankId == null) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const rows = await fetchTransactions(currentBankId);
-      setTransactions(rows || []);
-    } catch (err) {
-      // Supabase may not be configured; show empty
-      console.warn('TransactionHistory: fetch failed', err.message);
-      setError('Could not load history');
-      setTransactions([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [currentBankId]);
+  // Filter activity log for edge transactions involving this bank
+  const transactions = useMemo(() => {
+    if (!currentBankId) return [];
+    
+    return activityLog
+      .filter(entry => 
+        entry.type === 'LENDING' || 
+        entry.type === 'REPAYMENT' || 
+        entry.type === 'NEW_LINK'
+      )
+      .filter(entry => {
+        // Extract bank IDs from detail string (e.g., "Bank 2 → Bank 5")
+        const match = entry.detail?.match(/Bank (\d+) → Bank (\d+)/);
+        if (!match) return false;
+        const [, source, target] = match;
+        return source === String(currentBankId) || target === String(currentBankId);
+      })
+      .sort((a, b) => b.timestep - a.timestep) // Most recent first
+      .slice(0, 50); // Show last 50 transactions
+  }, [activityLog, currentBankId]);
 
-  // Load on mount and when bank changes
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const formatDate = (iso) => {
-    if (!iso) return '—';
-    const d = new Date(iso);
-    return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) +
-      ' ' + d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+  // Determine icon and direction for each transaction
+  const getTransactionDetails = (entry) => {
+    const match = entry.detail?.match(/Bank (\d+) → Bank (\d+)/);
+    if (!match) return { icon: ArrowRightLeft, direction: '—', counterparty: '—' };
+    
+    const [, source, target] = match;
+    const isOutgoing = source === String(currentBankId);
+    
+    let icon = ArrowRightLeft;
+    if (entry.type === 'LENDING') icon = TrendingDown;
+    if (entry.type === 'REPAYMENT') icon = TrendingUp;
+    if (entry.type === 'NEW_LINK') icon = Link;
+    
+    return {
+      icon,
+      direction: isOutgoing ? 'Outgoing' : 'Incoming',
+      counterparty: isOutgoing ? `Bank ${target}` : `Bank ${source}`,
+      amount: entry.message?.match(/₹([\d.]+)/)?.[1] || '0',
+    };
   };
 
   return (
@@ -50,54 +60,48 @@ export default function TransactionHistory() {
           <History size={14} />
           Transaction History
         </h3>
-        <button className="txhist-refresh-btn" onClick={load} disabled={loading} title="Refresh">
-          <RefreshCw size={13} className={loading ? 'txhist-spin' : ''} />
-        </button>
+        <span className="txhist-count">{transactions.length} transactions</span>
       </div>
 
-      {error && <div className="txhist-error">{error}</div>}
-
-      {transactions.length === 0 && !loading && !error ? (
-        <div className="txhist-empty">No transactions recorded yet.</div>
+      {transactions.length === 0 ? (
+        <div className="txhist-empty">
+          No transactions yet. Transactions will appear here as the simulation runs.
+        </div>
       ) : (
         <div className="txhist-table-wrap">
           <table className="txhist-table">
             <thead>
               <tr>
-                <th>Date</th>
+                <th>Step</th>
                 <th>Type</th>
+                <th>Direction</th>
                 <th>Counterparty</th>
                 <th>Amount</th>
-                <th>Result</th>
-                <th>Approved</th>
               </tr>
             </thead>
             <tbody>
-              {transactions.map((tx, i) => (
-                <tr key={tx.id || i}>
-                  <td className="txhist-date">{formatDate(tx.created_at)}</td>
-                  <td>
-                    <span className={`txhist-type txhist-type-${(tx.tx_type || '').toLowerCase()}`}>
-                      {tx.tx_type}
-                    </span>
-                  </td>
-                  <td className="txhist-cp">Bank {tx.counterparty_id}</td>
-                  <td className="txhist-amount">₹{Number(tx.amount || 0).toFixed(0)} Cr</td>
-                  <td>
-                    <span className={`txhist-outcome ${tx.outcome === 'PASS' ? 'pass' : 'fail'}`}>
-                      {tx.outcome === 'PASS' ? <Check size={12} /> : <X size={12} />}
-                      {tx.outcome}
-                    </span>
-                  </td>
-                  <td>
-                    {tx.approved ? (
-                      <span className="txhist-approved yes">Yes</span>
-                    ) : (
-                      <span className="txhist-approved no">No</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
+              {transactions.map((tx, i) => {
+                const details = getTransactionDetails(tx);
+                const Icon = details.icon;
+                return (
+                  <tr key={tx.id || i}>
+                    <td className="txhist-step">#{tx.timestep}</td>
+                    <td>
+                      <span className={`txhist-type txhist-type-${tx.type.toLowerCase()}`}>
+                        <Icon size={12} />
+                        {tx.type === 'NEW_LINK' ? 'New Link' : tx.type}
+                      </span>
+                    </td>
+                    <td>
+                      <span className={`txhist-direction ${details.direction.toLowerCase()}`}>
+                        {details.direction}
+                      </span>
+                    </td>
+                    <td className="txhist-cp">{details.counterparty}</td>
+                    <td className="txhist-amount">₹{details.amount} Cr</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

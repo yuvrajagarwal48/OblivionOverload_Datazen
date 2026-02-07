@@ -50,7 +50,7 @@
 .whatif-type-btn {
   flex: 1;
   padding: 7px 10px;
-  background: #0f172a;
+  background: var(--bg-primary);
   border: 1px solid #334155;
   border-radius: 6px;
   color: #94a3b8;
@@ -79,7 +79,7 @@
 .whatif-select,
 .whatif-input {
   padding: 8px 12px;
-  background: #0f172a;
+  background: var(--bg-primary);
   border: 1px solid #334155;
   border-radius: 6px;
   color: #e2e8f0;
@@ -101,7 +101,7 @@
 }
 
 .whatif-select option {
-  background: #1e293b;
+  background: var(--bg-secondary);
   color: #e2e8f0;
 }
 
@@ -191,7 +191,7 @@
   justify-content: center;
   gap: 16px;
   padding: 10px;
-  background: #0f172a;
+  background: var(--bg-primary);
   border-radius: 8px;
   margin-bottom: 10px;
 }
@@ -268,11 +268,11 @@
 }
 
 .whatif-reject-btn {
-  background: #334155;
+  background: var(--scrollbar-thumb);
   color: #94a3b8;
 }
 
 .whatif-reject-btn:hover {
-  background: #475569;
+  background: var(--scrollbar-thumb-hover);
   color: #e2e8f0;
 }

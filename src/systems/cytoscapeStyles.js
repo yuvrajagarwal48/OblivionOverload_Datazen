@@ -56,7 +56,7 @@ function edgeTypeColor(activityType) {
     case 'LENDING': return '#3b82f6';    // blue — money flowing
     case 'REPAYMENT': return '#10b981';  // green — repayment
     case 'NEW_LINK': return '#8b5cf6';   // purple — new relationship
-    default: return '#cbd5e1';           // grey — static
+    default: return '#94a3b8';           // grey — static
   }
 }
 
@@ -74,11 +74,11 @@ export function getCytoscapeStylesheet() {
         'text-valign': 'center',
         'text-halign': 'center',
         'font-size': '11px',
-        'font-weight': '600',
+        'font-weight': '700',
         'font-family': "'Inter', 'Segoe UI', sans-serif",
         'color': '#ffffff',
-        'text-outline-color': '#1e293b',
-        'text-outline-width': 2.5,
+        'text-outline-color': 'rgba(0, 0, 0, 0.6)',
+        'text-outline-width': 2,
         'width': (ele) => tierToSize(ele.data('tier')),
         'height': (ele) => tierToSize(ele.data('tier')),
         'background-color': (ele) => capitalRatioToColor(ele.data('capital_ratio')),
@@ -110,19 +110,38 @@ export function getCytoscapeStylesheet() {
       },
     },
 
-    // ─── DEFAULTED NODE ───
+    // ── DEFAULTED NODE ──
     {
       selector: 'node[status = "defaulted"]',
       style: {
-        'background-color': '#94a3b8',
-        'border-color': '#cbd5e1',
+        'background-color': '#cbd5e1',
+        'border-color': '#94a3b8',
         'border-width': 2,
-        'opacity': 0.4,
+        'opacity': 0.5,
         'color': '#64748b',
       },
     },
 
-    // ─── SELECTED NODE ───
+    // ── CCP NODE (Central Counterparty) ──
+    {
+      selector: 'node[node_type = "ccp"]',
+      style: {
+        'shape': 'diamond',
+        'width': 65,
+        'height': 65,
+        'background-color': '#7c3aed',
+        'border-color': '#6d28d9',
+        'border-width': 3,
+        'label': 'data(label)',
+        'font-size': '11px',
+        'font-weight': '800',
+        'color': '#ffffff',
+        'text-outline-color': 'rgba(0, 0, 0, 0.5)',
+        'text-outline-width': 2,
+      },
+    },
+
+    // ── SELECTED NODE ──
     {
       selector: 'node:selected',
       style: {
@@ -145,15 +164,20 @@ export function getCytoscapeStylesheet() {
         'curve-style': 'bezier',
         'opacity': 0.5,
         'label': (ele) => ele.data('activity_label') || '',
-        'font-size': '8px',
-        'font-weight': '600',
-        'color': '#e2e8f0',
-        'text-background-color': '#1e293b',
-        'text-background-opacity': 0.85,
-        'text-background-padding': '3px',
+        'font-size': '10px',
+        'font-weight': '700',
+        'color': '#1e293b',
+        'text-background-color': '#ffffff',
+        'text-background-opacity': 0.95,
+        'text-background-padding': '4px',
+        'text-border-color': '#cbd5e1',
+        'text-border-width': 1,
+        'text-border-opacity': 1,
         'text-background-shape': 'roundrectangle',
         'text-rotation': 'autorotate',
-        'text-margin-y': -8,
+        'text-margin-y': -12,
+        'text-wrap': 'wrap',
+        'text-max-width': '220px',
         'edge-text-rotation': 'autorotate',
         'transition-property': 'line-color, opacity, width',
         'transition-duration': '300ms',

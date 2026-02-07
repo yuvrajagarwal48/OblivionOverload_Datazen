@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import useSimulationStore from '../store/simulationStore';
 import { SCENARIOS, CUSTOM_OPTIONS } from '../config';
-import { Scale, Snowflake, Flame, Swords, FlaskConical, Check, ChevronUp, ChevronDown } from 'lucide-react';
+import { Scale, Snowflake, Flame, Swords, FlaskConical, Check, ChevronUp, ChevronDown, Settings } from 'lucide-react';
+import CustomSetup from './CustomSetup';
 import './ScenarioSelector.css';
 
 const ICON_MAP = {
@@ -19,16 +20,50 @@ export default function ScenarioSelector() {
   const setScenario = useSimulationStore((s) => s.setScenario);
   const customConfig = useSimulationStore((s) => s.customConfig);
   const setCustomConfig = useSimulationStore((s) => s.setCustomConfig);
+  const useManualSetup = useSimulationStore((s) => s.useManualSetup);
+  const setUseManualSetup = useSimulationStore((s) => s.setUseManualSetup);
   const simStatus = useSimulationStore((s) => s.simStatus);
 
   const [customExpanded, setCustomExpanded] = useState(false);
 
   const isDisabled = simStatus === 'running';
 
+  // If manual setup is active, show CustomSetup component
+  if (useManualSetup) {
+    return (
+      <div className="scenario-selector">
+        <div className="mode-toggle">
+          <button
+            className="mode-toggle-btn"
+            onClick={() => setUseManualSetup(false)}
+            disabled={isDisabled}
+          >
+            <Scale size={14} />
+            <span>Switch to Scenarios</span>
+          </button>
+        </div>
+        <CustomSetup />
+      </div>
+    );
+  }
+
   return (
     <div className="scenario-selector">
-      <h2 className="scenario-title">Select Scenario</h2>
-      <p className="scenario-subtitle">Choose a stress test to simulate</p>
+      <div className="scenario-header-row">
+        <div>
+          <h2 className="scenario-title">Select Scenario</h2>
+          <p className="scenario-subtitle">Choose a stress test to simulate</p>
+        </div>
+        <button
+          className="manual-setup-btn"
+          onClick={() => setUseManualSetup(true)}
+          disabled={isDisabled}
+          title="Switch to manual setup"
+        >
+          <Settings size={16} />
+          <span>Manual Setup</span>
+        </button>
+      </div>
 
       <div className="scenario-cards">
         {SCENARIOS.map((scenario) => {

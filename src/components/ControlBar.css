@@ -26,10 +26,10 @@
   align-items: center;
   gap: 5px;
   padding: 4px 12px;
-  border: 1px solid #334155;
+  border: 1px solid var(--border-secondary);
   border-radius: 6px;
-  background: #1e293b;
-  color: #cbd5e1;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
   font-family: inherit;
   font-size: 11px;
   font-weight: 600;
@@ -39,9 +39,9 @@
 }
 
 .ctrl-btn:hover:not(:disabled) {
-  background: #334155;
-  border-color: #475569;
-  color: #f1f5f9;
+  background: var(--bg-tertiary);
+  border-color: var(--border-secondary);
+  color: var(--text-primary);
 }
 
 .ctrl-btn:disabled {
@@ -78,10 +78,10 @@
 }
 
 /* Step */
-.ctrl-step { border-color: #334155; }
+.ctrl-step { border-color: var(--border-secondary); }
 
 /* Reset */
-.ctrl-reset { border-color: #334155; }
+.ctrl-reset { border-color: var(--border-secondary); }
 
 /* Status badge — hidden in IDE mode, titlebar handles it */
 .status-badge { display: none; }

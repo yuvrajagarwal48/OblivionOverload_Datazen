@@ -1,5 +1,6 @@
 import React from 'react';
 import useSimulationStore from '../store/simulationStore';
+import { AlertCircle } from 'lucide-react';
 import './InspectorPanel.css';
 
 function Sparkline({ data }) {
@@ -35,9 +36,23 @@ function InspectorPanel() {
   const nodes = useSimulationStore((state) => state?.nodes || []);
   const selectedBanks = useSimulationStore((state) => state?.selectedBanks || []);
   const bankHistory = useSimulationStore((state) => state?.bankHistory || {});
+  const backendInitialized = useSimulationStore((state) => state?.backendInitialized ?? false);
   const toggleBankSelection = useSimulationStore((state) => state?.selectBank);
   const deselectBank = useSimulationStore((state) => state?.deselectBank);
   const clearBankSelection = useSimulationStore((state) => state?.clearBankSelection);
+
+  // Show placeholder if simulation not initialized
+  if (!backendInitialized || nodes.length === 0) {
+    return (
+      <div className="panel-uninitialized">
+        <AlertCircle size={64} className="panel-uninitialized-icon" />
+        <div className="panel-uninitialized-title">No Banks Available</div>
+        <div className="panel-uninitialized-text">
+          Initialize the simulation first to inspect banks. Banks will appear here once the simulation starts.
+        </div>
+      </div>
+    );
+  }
 
   const handleBankClick = (bankId) => {
     if (selectedBanks.includes(String(bankId))) {

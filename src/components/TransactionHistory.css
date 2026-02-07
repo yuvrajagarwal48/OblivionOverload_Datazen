@@ -26,28 +26,13 @@
   margin: 0;
 }
 
-.txhist-refresh-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  background: #1e293b;
-  border: 1px solid #334155;
-  border-radius: 6px;
+.txhist-count {
+  font-size: 10px;
+  font-weight: 600;
   color: #64748b;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.txhist-refresh-btn:hover {
-  color: #e2e8f0;
-  border-color: #475569;
-}
-
-@keyframes txhist-spin-anim {
-  to { transform: rotate(360deg); }
+  background: rgba(100, 116, 139, 0.1);
+  padding: 4px 8px;
+  border-radius: 4px;
 }
 
 .txhist-spin {
@@ -57,10 +42,10 @@
 /* Error & Empty */
 .txhist-error {
   padding: 8px 12px;
-  background: rgba(239, 68, 68, 0.1);
+  background: rgba(239, 68, 68, 0.08);
   border: 1px solid rgba(239, 68, 68, 0.2);
   border-radius: 6px;
-  color: #fca5a5;
+  color: #dc2626;
   font-size: 12px;
 }
 
@@ -91,12 +76,12 @@
   color: #64748b;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  border-bottom: 1px solid #1e293b;
+  border-bottom: 1px solid var(--border-primary);
   white-space: nowrap;
 }
 
 .txhist-table tbody tr {
-  border-bottom: 1px solid #1e293b;
+  border-bottom: 1px solid var(--border-primary);
   transition: background 0.15s;
 }
 
@@ -106,37 +91,58 @@
 
 .txhist-table tbody td {
   padding: 8px 10px;
-  color: #cbd5e1;
+  color: #334155;
   white-space: nowrap;
 }
 
-.txhist-date {
+.txhist-step {
   color: #64748b;
   font-variant-numeric: tabular-nums;
+  font-weight: 600;
 }
 
 /* Type badges */
 .txhist-type {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   padding: 2px 8px;
   border-radius: 4px;
   font-size: 11px;
   font-weight: 700;
 }
 
-.txhist-type-lend {
-  background: rgba(16, 185, 129, 0.12);
-  color: #10b981;
-}
-
-.txhist-type-borrow {
+.txhist-type-lending {
   background: rgba(59, 130, 246, 0.12);
   color: #3b82f6;
 }
 
-.txhist-type-sell_assets {
-  background: rgba(245, 158, 11, 0.12);
-  color: #f59e0b;
+.txhist-type-repayment {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+}
+
+.txhist-type-new_link {
+  background: rgba(168, 85, 247, 0.12);
+  color: #a855f7;
+}
+
+/* Direction badges */
+.txhist-direction {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.txhist-direction.outgoing {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.txhist-direction.incoming {
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.1);
 }
 
 .txhist-cp {
@@ -146,33 +152,7 @@
 .txhist-amount {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-}
-
-/* Outcome badges */
-.txhist-outcome {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.txhist-outcome.pass {
-  color: #10b981;
-}
-
-.txhist-outcome.fail {
-  color: #ef4444;
-}
-
-/* Approved */
-.txhist-approved {
-  font-size: 11px;
-  font-weight: 600;
-}
-
-.txhist-approved.yes {
-  color: #10b981;
+  color: #0f172a;
 }
 
 .txhist-approved.no {

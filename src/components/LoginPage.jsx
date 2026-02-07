@@ -4,16 +4,21 @@ import { signInBank, fetchBankProfile, logSessionAction } from '../lib/supabase'
 import useSimulationStore from '../store/simulationStore';
 import './LoginPage.css';
 
-// Predefined bank list for demo/quick-select
-const DEMO_BANKS = Array.from({ length: 30 }, (_, i) => ({
-  bank_id: i,
-  name: i < 6 ? `Core Bank ${i}` : `Peripheral Bank ${i}`,
-  tier: i < 6 ? 1 : 2,
-  email: `bank${i}@finsim.local`,
-}));
-
 export default function LoginPage() {
   const setAuth = useSimulationStore((s) => s.setAuth);
+  const nodes = useSimulationStore((s) => s.nodes || []);
+  const backendInitialized = useSimulationStore((s) => s.backendInitialized ?? false);
+  
+  // Build bank list from simulation nodes (only after initialization)
+  const availableBanks = backendInitialized && nodes.length > 0
+    ? nodes.map((n) => ({
+        bank_id: Number(n.id),
+        name: n.label || `Bank ${n.id}`,
+        tier: n.tier || 2,
+        email: `bank${n.id}@finsim.local`,
+      }))
+    : [];
+  
   const [mode, setMode] = useState('select'); // 'select' | 'credentials'
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -123,6 +128,7 @@ export default function LoginPage() {
 
         {mode === 'select' ? (
           /* ── Bank Selection Grid ── */
+          availableBanks.length > 0 ? (
           <div className="bank-select-grid">
             <div className="bank-tier-group">
               <h3 className="tier-group-title">
@@ -130,7 +136,7 @@ export default function LoginPage() {
                 Tier-1 Core Banks
               </h3>
               <div className="bank-buttons">
-                {DEMO_BANKS.filter((b) => b.tier === 1).map((bank) => (
+                {availableBanks.filter((b) => b.tier === 1).map((bank) => (
                   <button
                     key={bank.bank_id}
                     className={`bank-select-btn tier-1-btn ${selectedBank?.bank_id === bank.bank_id ? 'selected' : ''}`}
@@ -150,7 +156,7 @@ export default function LoginPage() {
                 Tier-2 Peripheral Banks
               </h3>
               <div className="bank-buttons">
-                {DEMO_BANKS.filter((b) => b.tier === 2).map((bank) => (
+                {availableBanks.filter((b) => b.tier === 2).map((bank) => (
                   <button
                     key={bank.bank_id}
                     className={`bank-select-btn tier-2-btn ${selectedBank?.bank_id === bank.bank_id ? 'selected' : ''}`}
@@ -175,6 +181,17 @@ export default function LoginPage() {
               </button>
             )}
           </div>
+          ) : (
+            <div className="bank-select-empty">
+              <AlertCircle size={48} style={{ color: '#64748b', marginBottom: '16px' }} />
+              <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#94a3b8', marginBottom: '8px' }}>
+                No Banks Available
+              </h3>
+              <p style={{ fontSize: '14px', color: '#64748b', textAlign: 'center', maxWidth: '320px' }}>
+                Initialize the simulation first as an Observer, then return here to login as a specific bank.
+              </p>
+            </div>
+          )
         ) : (
           /* ── Credential Form ── */
           <form className="login-form" onSubmit={handleCredentialLogin}>

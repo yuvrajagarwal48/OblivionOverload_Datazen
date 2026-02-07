@@ -77,6 +77,20 @@ const useSimulationStore = create((set, get) => ({
   selectedBanks: [],
   bankViewOpen: false,
 
+  // ─── Manual Configuration (Custom Setup) ───
+  manualConfig: {
+    banks: [],
+    ccps: [],
+    market: {
+      initial_price: 100,
+      interest_rate: 2.5,
+      liquidity_index: 0.8,
+      volatility: 0.2,
+      episode_length: 100,
+    },
+  },
+  useManualSetup: false, // Toggle between scenario and manual setup
+
   // ─── View State ───
   activeView: 'overview', // 'overview' | 'network' | 'analytics' | 'inspector'
 
@@ -91,6 +105,13 @@ const useSimulationStore = create((set, get) => ({
 
   // ─── Edge Activity Labels (what is happening on each edge) ───
   edgeActivity: {}, // { 'source-target': { label, type, delta, timestep } }
+
+  // ─── Panel Sizes (for resize functionality) ───
+  panelSizes: {
+    leftSidebar: 280,
+    rightPanel: 300,
+    bottomPanel: 220,
+  },
 
   // ─── Layout tracking ───
   layoutComputed: false,
@@ -305,7 +326,7 @@ const useSimulationStore = create((set, get) => ({
     });
 
     const step = get().timestep;
-    const newEdgeActivity = {};
+    const newEdgeActivity = {}; // Fresh state for current edges
     const edgeLogEntries = [];
 
     const edges = edgeList.map((e) => {
@@ -315,37 +336,44 @@ const useSimulationStore = create((set, get) => ({
       const prevEdge = prevEdgeMap[key];
       const weight = e.weight ?? 0;
 
+      // Always show current weight on edge
+      const currentLabel = weight > 1 ? `₹${weight.toFixed(0)}` : '';
+
       if (prevEdge) {
         const delta = weight - (prevEdge.weight ?? 0);
         if (Math.abs(delta) > 0.5) {
           const type = delta > 0 ? 'LENDING' : 'REPAYMENT';
-          const label = delta > 0
-            ? `+₹${delta.toFixed(0)}`
-            : `−₹${Math.abs(delta).toFixed(0)}`;
-          newEdgeActivity[key] = { label, type, delta, timestep: step };
+          const fullMessage = `Bank ${src} ${delta > 0 ? '→' : '←'} Bank ${tgt}: ₹${Math.abs(delta).toFixed(0)} (Total: ₹${weight.toFixed(0)})`;
+          newEdgeActivity[key] = { label: currentLabel, message: fullMessage, type, delta, timestep: step };
           edgeLogEntries.push({
             id: `log-${step}-edge-${key}`,
             timestep: step,
             type,
             icon: delta > 0 ? '→' : '←',
             message: `B${src} ${delta > 0 ? '→ lent to' : '← repaid by'} B${tgt}: ₹${Math.abs(delta).toFixed(0)}`,
-            detail: `Exposure: ${prevEdge.weight?.toFixed(0)} → ${weight.toFixed(0)}`,
+            detail: `Bank ${src} → Bank ${tgt}`,
             color: delta > 0 ? '#3b82f6' : '#10b981',
           });
+        } else {
+          // No significant change, just show current weight
+          newEdgeActivity[key] = { label: currentLabel, message: `${src} → ${tgt}: ₹${weight.toFixed(0)}`, type: 'STATIC', delta: 0, timestep: step };
         }
       } else {
         // New edge = new lending relationship
         if (weight > 1) {
-          newEdgeActivity[key] = { label: `NEW ₹${weight.toFixed(0)}`, type: 'NEW_LINK', delta: weight, timestep: step };
+          const fullMessage = `New Link: Bank ${src} → Bank ${tgt} (₹${weight.toFixed(0)})`;
+          newEdgeActivity[key] = { label: currentLabel, message: fullMessage, type: 'NEW_LINK', delta: weight, timestep: step };
           edgeLogEntries.push({
             id: `log-${step}-newedge-${key}`,
             timestep: step,
             type: 'NEW_LINK',
             icon: '🔗',
             message: `New link: B${src} → B${tgt} (₹${weight.toFixed(0)})`,
-            detail: 'New interbank lending relationship formed',
+            detail: `Bank ${src} → Bank ${tgt}`,
             color: '#8b5cf6',
           });
+        } else {
+          newEdgeActivity[key] = { label: currentLabel, message: `${src} → ${tgt}: ₹${weight.toFixed(0)}`, type: 'STATIC', delta: 0, timestep: step };
         }
       }
 
@@ -362,6 +390,39 @@ const useSimulationStore = create((set, get) => ({
       : get().activityLog;
 
     set({ edges, edgeActivity: newEdgeActivity, activityLog: updatedLog });
+    
+    // If topology includes nodes (may include CCP nodes), merge them
+    // This will be called separately by useSimulationControl after fetching topology
+  },
+
+  // ─── Ingest topology nodes (may include CCPs) ───
+  ingestTopologyNodes: (nodeList) => {
+    if (!nodeList || nodeList.length === 0) return;
+    
+    const currentNodes = get().nodes;
+    const nodeMap = {};
+    currentNodes.forEach(n => { nodeMap[String(n.id)] = n; });
+    
+    // Merge topology nodes with existing nodes (add CCPs, update banks)
+    const mergedNodes = nodeList.map(n => {
+      const id = String(n.id);
+      const existing = nodeMap[id];
+      
+      return {
+        ...existing,
+        id,
+        label: n.label || existing?.label || `Node ${id}`,
+        tier: n.tier ?? existing?.tier ?? 3,
+        capital_ratio: n.capital_ratio ?? existing?.capital_ratio ?? 0,
+        status: n.status ?? existing?.status ?? 'active',
+        stress: n.stress ?? existing?.stress ?? 0,
+        cash: n.cash ?? existing?.cash ?? 0,
+        equity: n.equity ?? existing?.equity ?? 0,
+        node_type: n.node_type || (id.startsWith('CCP') ? 'ccp' : 'bank'), // Mark CCPs
+      };
+    });
+    
+    set({ nodes: mergedNodes });
   },
 
   // ─── Ingest risk metrics (legacy GET /metrics/risk) ───
@@ -514,6 +575,14 @@ const useSimulationStore = create((set, get) => ({
       customConfig: { ...state.customConfig, [key]: value },
     })),
 
+  // ─── Actions: Manual Configuration ───
+  setManualConfig: (key, value) =>
+    set((state) => ({
+      manualConfig: { ...state.manualConfig, [key]: value },
+    })),
+
+  setUseManualSetup: (value) => set({ useManualSetup: value }),
+
   // ─── Actions: Bank Selection ───
   toggleBankSelection: (bankId) => {
     const id = String(bankId);
@@ -623,6 +692,11 @@ const useSimulationStore = create((set, get) => ({
 
   // ─── Actions: Layout ───
   setLayoutComputed: (val) => set({ layoutComputed: val }),
+  
+  setPanelSize: (panel, size) => 
+    set((state) => ({
+      panelSizes: { ...state.panelSizes, [panel]: size },
+    })),
 
   // ─── Actions: Reset ───
   resetAll: () =>

@@ -38,28 +38,29 @@ export default function NetworkGraph() {
       group: 'nodes',
       data: {
         id: String(n.id),
-        label: `B${n.id}`,
+        label: n.label || (n.node_type === 'ccp' ? `CCP-${n.id}` : `B${n.id}`),
         tier: n.tier,
         capital_ratio: n.capital_ratio,
         stress: n.stress,
         status: n.status,
+        node_type: n.node_type || 'bank',
         last_updated_timestep: n.last_updated_timestep,
         last_decision: decisions[n.id] || decisions[String(n.id)] || '',
       },
     }));
 
-    const cyEdges = edgeList.map((e, i) => {
+    const cyEdges = edgeList.map((e) => {
       const key = `${e.source}-${e.target}`;
       const act = activity[key];
       return {
         group: 'edges',
         data: {
-          id: `e-${e.source}-${e.target}-${i}`,
+          id: `e-${e.source}-${e.target}`,
           source: String(e.source),
           target: String(e.target),
           weight: e.weight,
           type: e.type || 'credit',
-          activity_label: act?.label || '',
+          activity_label: act?.message || act?.label || '',
           activity_type: act?.type || '',
         },
       };
@@ -94,23 +95,33 @@ export default function NetworkGraph() {
       setLayoutComputed(true);
     } else {
       // SUBSEQUENT STATE_UPDATEs: batch-update data only, NO relayout
+      const existingNodeIds = new Set();
+      const existingEdgeIds = new Set();
+
       cy.batch(() => {
+        // Update existing nodes and track which exist
         nodes.forEach((n) => {
-          const cyNode = cy.getElementById(String(n.id));
+          const id = String(n.id);
+          existingNodeIds.add(id);
+          const cyNode = cy.getElementById(id);
           if (cyNode.length) {
             cyNode.data({
+              label: n.label || (n.node_type === 'ccp' ? `CCP-${n.id}` : `B${n.id}`),
               tier: n.tier,
               capital_ratio: n.capital_ratio,
               stress: n.stress,
               status: n.status,
+              node_type: n.node_type || 'bank',
               last_updated_timestep: n.last_updated_timestep,
               last_decision: nodeDecisions[n.id] || nodeDecisions[String(n.id)] || '',
             });
           }
         });
 
-        edges.forEach((e, i) => {
-          const edgeId = `e-${e.source}-${e.target}-${i}`;
+        // Update existing edges and track which exist
+        edges.forEach((e) => {
+          const edgeId = `e-${e.source}-${e.target}`;
+          existingEdgeIds.add(edgeId);
           const cyEdge = cy.getElementById(edgeId);
           const key = `${e.source}-${e.target}`;
           const act = edgeActivity[key];
@@ -118,11 +129,54 @@ export default function NetworkGraph() {
             cyEdge.data({
               weight: e.weight,
               type: e.type || 'credit',
-              activity_label: act?.label || '',
+              activity_label: act?.message || act?.label || '',
               activity_type: act?.type || '',
             });
           }
         });
+      });
+
+      // Add new nodes that don't exist in Cytoscape yet (e.g., CCP nodes added later)
+      nodes.forEach((n) => {
+        const id = String(n.id);
+        if (!cy.getElementById(id).length) {
+          cy.add({
+            group: 'nodes',
+            data: {
+              id,
+              label: n.label || (n.node_type === 'ccp' ? `CCP-${n.id}` : `B${n.id}`),
+              tier: n.tier,
+              capital_ratio: n.capital_ratio,
+              stress: n.stress,
+              status: n.status,
+              node_type: n.node_type || 'bank',
+              last_updated_timestep: n.last_updated_timestep,
+              last_decision: nodeDecisions[n.id] || nodeDecisions[String(n.id)] || '',
+            },
+            position: { x: Math.random() * 400 + 100, y: Math.random() * 400 + 100 },
+          });
+        }
+      });
+
+      // Add new edges that don't exist in Cytoscape yet
+      edges.forEach((e) => {
+        const edgeId = `e-${e.source}-${e.target}`;
+        if (!cy.getElementById(edgeId).length) {
+          const key = `${e.source}-${e.target}`;
+          const act = edgeActivity[key];
+          cy.add({
+            group: 'edges',
+            data: {
+              id: edgeId,
+              source: String(e.source),
+              target: String(e.target),
+              weight: e.weight,
+              type: e.type || 'credit',
+              activity_label: act?.message || act?.label || '',
+              activity_type: act?.type || '',
+            },
+          });
+        }
       });
     }
   }, [nodes, edges, nodeDecisions, edgeActivity, layoutComputed, setLayoutComputed, toCyElements]);
@@ -151,10 +205,10 @@ export default function NetworkGraph() {
         toggleBankSelection(nodeId);
       });
 
-      // Dark background
+      // Light background interaction
       cy.style().selector('core').style({
-        'active-bg-color': '#58a6ff',
-        'active-bg-opacity': 0.1,
+        'active-bg-color': '#3b82f6',
+        'active-bg-opacity': 0.08,
       });
     },
     [toggleBankSelection]

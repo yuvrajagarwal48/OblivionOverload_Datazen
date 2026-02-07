@@ -25,6 +25,8 @@ export default function useSimulationControl() {
   const resetAll = useSimulationStore((s) => s.resetAll);
   const selectedScenario = useSimulationStore((s) => s.selectedScenario);
   const customConfig = useSimulationStore((s) => s.customConfig);
+  const manualConfig = useSimulationStore((s) => s.manualConfig);
+  const useManualSetup = useSimulationStore((s) => s.useManualSetup);
   const setNodeDecision = useSimulationStore((s) => s.setNodeDecision);
 
   // API-mode state
@@ -33,6 +35,7 @@ export default function useSimulationControl() {
   const setBackendInitialized = useSimulationStore((s) => s.setBackendInitialized);
   const ingestMetrics = useSimulationStore((s) => s.ingestMetrics);
   const ingestEdges = useSimulationStore((s) => s.ingestEdges);
+  const ingestTopologyNodes = useSimulationStore((s) => s.ingestTopologyNodes);
   const ingestStepResult = useSimulationStore((s) => s.ingestStepResult);
   const ingestRiskMetrics = useSimulationStore((s) => s.ingestRiskMetrics);
 
@@ -53,9 +56,13 @@ export default function useSimulationControl() {
       }
       if (topoRes.status === 'fulfilled') {
         if (topoRes.value.edges) ingestEdges(topoRes.value.edges);
-        // Also use topology nodes if metrics didn't provide them
-        if (topoRes.value.nodes && metricsRes.status !== 'fulfilled') {
-          ingestMetrics({ banks: Object.fromEntries(topoRes.value.nodes.map(n => [n.id, n])), step: 0 });
+        // Ingest topology nodes (may include CCP nodes)
+        if (topoRes.value.nodes) {
+          ingestTopologyNodes(topoRes.value.nodes);
+          // If metrics fetch failed, also populate basic bank data from topology
+          if (metricsRes.status !== 'fulfilled') {
+            ingestMetrics({ banks: Object.fromEntries(topoRes.value.nodes.map(n => [n.id, n])), step: 0 });
+          }
         }
       }
       if (riskRes.status === 'fulfilled') {
@@ -64,7 +71,7 @@ export default function useSimulationControl() {
     } catch (err) {
       console.error('[API] fetchFullState error:', err);
     }
-  }, [ingestMetrics, ingestEdges, ingestRiskMetrics]);
+  }, [ingestMetrics, ingestEdges, ingestTopologyNodes, ingestRiskMetrics]);
 
   // ─── Poll loop: step + fetch state ───
   const startPolling = useCallback(() => {
@@ -138,19 +145,29 @@ export default function useSimulationControl() {
   // ─── API-mode play ───
   const playAPI = useCallback(async () => {
     const scenario = selectedScenario;
-    if (!scenario) {
+    if (!useManualSetup && !scenario) {
       console.warn('[API] No scenario selected');
       return false;
     }
 
     setApiLoading(true);
     try {
-      // Initialize simulation via legacy endpoint
-      await api.initSimulation({
-        num_banks: 30,
+      // Build config from manual setup or use defaults
+      const initConfig = useManualSetup ? {
+        num_banks: manualConfig.banks.length || 5,
+        episode_length: manualConfig.market.episode_length || 100,
+        scenario: 'custom',
+        banks: manualConfig.banks,
+        ccps: manualConfig.ccps,
+        market: manualConfig.market,
+      } : {
+        num_banks: 5,
         episode_length: 100,
         scenario: 'normal',
-      });
+      };
+
+      // Initialize simulation via legacy endpoint
+      await api.initSimulation(initConfig);
       setBackendInitialized(true);
 
       // Fetch initial state

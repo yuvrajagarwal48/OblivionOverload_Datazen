@@ -21,7 +21,7 @@
 }
 
 .bank-view-tab:hover {
-  color: #0f172a;
+  color: var(--text-primary);
   background: #f8fafc;
 }
 
@@ -65,7 +65,7 @@
 .bank-view-title {
   font-size: 16px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--text-primary);
   margin: 0;
 }
 
@@ -136,7 +136,7 @@
   gap: 8px;
   font-weight: 700;
   font-size: 14px;
-  color: #0f172a;
+  color: var(--text-primary);
 }
 
 .bank-status-dot {
@@ -281,7 +281,7 @@
 .comparison-title {
   font-size: 13px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--text-primary);
   margin: 0 0 12px;
 }
 
@@ -311,7 +311,7 @@
 }
 
 .comparison-table td {
-  color: #1e293b;
+  color: var(--text-secondary);
   font-variant-numeric: tabular-nums;
   font-weight: 600;
 }

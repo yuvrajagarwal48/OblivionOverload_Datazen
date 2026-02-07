@@ -8,7 +8,7 @@
   gap: 0;
   height: 100%;
   overflow-y: auto;
-  background: #0f172a;
+  background: var(--bg-primary);
 }
 
 /* Header */
@@ -17,8 +17,8 @@
   align-items: center;
   justify-content: space-between;
   padding: 16px 20px;
-  border-bottom: 1px solid #1e293b;
-  background: linear-gradient(135deg, #0f172a, #1e293b);
+  border-bottom: 1px solid var(--border-primary);
+  background: linear-gradient(135deg, var(--bg-primary), var(--bg-secondary));
 }
 
 .bd-bank-identity {
@@ -50,15 +50,15 @@
 .bd-bank-name {
   font-size: 16px;
   font-weight: 700;
-  color: #f1f5f9;
+  color: var(--text-primary);
   margin: 0;
 }
 
 .bd-timestep {
   font-size: 11px;
   font-weight: 700;
-  color: #64748b;
-  background: #0f172a;
+  color: var(--text-tertiary);
+  background: var(--bg-primary);
   padding: 4px 10px;
   border-radius: 4px;
   letter-spacing: 0.5px;
@@ -67,13 +67,13 @@
 /* Sections */
 .bd-section {
   padding: 16px 20px;
-  border-bottom: 1px solid #1e293b;
+  border-bottom: 1px solid var(--border-primary);
 }
 
 .bd-section-title {
   font-size: 11px;
   font-weight: 700;
-  color: #94a3b8;
+  color: var(--text-tertiary);
   text-transform: uppercase;
   letter-spacing: 1px;
   margin: 0 0 12px;
@@ -88,8 +88,8 @@
 }
 
 .bd-metric-card {
-  background: #1e293b;
-  border: 1px solid #334155;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-secondary);
   border-radius: 8px;
   padding: 10px 12px;
 }
@@ -98,15 +98,15 @@
 .bd-interbank-section {
   margin-top: 12px;
   padding: 12px;
-  background: #1e293b;
-  border: 1px solid #334155;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-secondary);
   border-radius: 8px;
 }
 
 .bd-subsection-title {
   font-size: 10px;
   font-weight: 700;
-  color: #64748b;
+  color: var(--text-tertiary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin: 0 0 10px;
@@ -127,7 +127,7 @@
 .bd-interbank-label {
   font-size: 10px;
   font-weight: 700;
-  color: #94a3b8;
+  color: var(--text-tertiary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-bottom: 4px;
@@ -137,10 +137,10 @@
   display: flex;
   justify-content: space-between;
   padding: 6px 8px;
-  background: #0f172a;
+  background: var(--bg-primary);
   border-radius: 4px;
   font-size: 11px;
-  color: #cbd5e1;
+  color: var(--text-secondary);
 }
 
 .bd-interbank-amount {
@@ -152,8 +152,8 @@
 /* Metrics Grid (old) */
 
 .bd-metric-card {
-  background: #1e293b;
-  border: 1px solid #334155;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-secondary);
   border-radius: 8px;
   padding: 10px 12px;
 }
@@ -161,7 +161,7 @@
 .bd-metric-label {
   font-size: 10px;
   font-weight: 600;
-  color: #64748b;
+  color: var(--text-tertiary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-bottom: 4px;
@@ -170,7 +170,7 @@
 .bd-metric-value {
   font-size: 18px;
   font-weight: 800;
-  color: #e2e8f0;
+  color: var(--text-primary);
   font-variant-numeric: tabular-nums;
 }
 
@@ -181,14 +181,14 @@
   gap: 12px;
   margin-top: 12px;
   padding: 8px 12px;
-  background: #1e293b;
+  background: var(--bg-secondary);
   border-radius: 8px;
 }
 
 .bd-sparkline-label {
   font-size: 10px;
   font-weight: 600;
-  color: #64748b;
+  color: var(--text-tertiary);
   text-transform: uppercase;
   white-space: nowrap;
 }
@@ -209,11 +209,11 @@
   align-items: center;
   gap: 6px;
   padding: 6px 12px;
-  background: #1e293b;
-  border: 1px solid #334155;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-secondary);
   border-radius: 6px;
   font-size: 12px;
-  color: #e2e8f0;
+  color: var(--text-primary);
 }
 
 .bd-neighbor-dot {
@@ -243,8 +243,8 @@
   font-weight: 700;
   padding: 1px 5px;
   border-radius: 3px;
-  color: #94a3b8;
-  background: #0f172a;
+  color: var(--text-tertiary);
+  background: var(--bg-primary);
 }
 
 /* System Metrics */
@@ -259,20 +259,20 @@
   align-items: center;
   justify-content: space-between;
   padding: 8px 12px;
-  background: #1e293b;
+  background: var(--bg-secondary);
   border-radius: 6px;
 }
 
 .bd-sys-label {
   font-size: 12px;
-  color: #94a3b8;
+  color: var(--text-tertiary);
   font-weight: 500;
 }
 
 .bd-sys-value {
   font-size: 13px;
   font-weight: 700;
-  color: #e2e8f0;
+  color: var(--text-primary);
   font-variant-numeric: tabular-nums;
 }
 
@@ -280,7 +280,7 @@
 .bd-empty {
   padding: 16px;
   text-align: center;
-  color: #475569;
+  color: var(--text-muted);
   font-size: 13px;
   font-style: italic;
 }
@@ -291,6 +291,6 @@
 }
 
 .bank-dashboard::-webkit-scrollbar-thumb {
-  background: #334155;
+  background: var(--bg-tertiary);
   border-radius: 2px;
 }
