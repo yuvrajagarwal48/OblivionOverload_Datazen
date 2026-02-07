@@ -86,6 +86,12 @@ const useSimulationStore = create((set, get) => ({
   // ─── Bank History (rolling buffer for time-series) ───
   bankHistory: {}, // { [bankId]: [{ timestep, capital_ratio, stress, status }, ...] }
 
+  // ─── Activity Log (scrollable feed of node + edge activity) ───
+  activityLog: [], // [{ id, timestep, type, icon, message, detail, color }]
+
+  // ─── Edge Activity Labels (what is happening on each edge) ───
+  edgeActivity: {}, // { 'source-target': { label, type, delta, timestep } }
+
   // ─── Layout tracking ───
   layoutComputed: false,
 
@@ -95,89 +101,302 @@ const useSimulationStore = create((set, get) => ({
   clearApiError: () => set({ apiError: null }),
   setBackendInitialized: (val) => set({ backendInitialized: val }),
 
-  // ─── Actions: Ingest full backend state snapshot ───
-  ingestBackendState: (data) => {
-    // data comes from GET /api/simulation/state
-    // { timestep, market, network_stats, banks, exchanges, ccps }
+  // ─── Actions: Ingest full metrics snapshot (legacy GET /metrics) ───
+  ingestMetrics: (data) => {
+    // data from GET /metrics (legacy)
+    // { step, network: {num_banks, density, ...}, market: {asset_price, ...}, banks: {[id]: {equity, capital_ratio, cash, status, tier}}, scenario }
     const prevHistory = get().bankHistory;
     const newHistory = { ...prevHistory };
+    const step = data.step ?? get().timestep;
 
     // Convert banks dict → nodes array
-    const nodes = Object.values(data.banks || {}).map((b) => {
-      const id = String(b.bank_id);
+    const banks = data.banks || {};
+    const nodes = Object.entries(banks).map(([bankId, b]) => {
+      const id = String(bankId);
       const entry = {
-        timestep: data.timestep,
-        capital_ratio: b.capital_ratio,
-        stress: b.stress || 0,
-        status: b.status,
+        timestep: step,
+        capital_ratio: b.capital_ratio ?? 0,
+        stress: 0,
+        status: b.status ?? 'active',
       };
       if (!newHistory[id]) newHistory[id] = [];
-      newHistory[id] = [...newHistory[id].slice(-(49)), entry];
+      newHistory[id] = [...newHistory[id].slice(-49), entry];
 
       return {
         id,
-        tier: b.tier,
-        capital_ratio: b.capital_ratio,
-        stress: b.stress || 0,
-        status: b.status,
-        cash: b.cash,
-        total_assets: b.total_assets,
-        total_liabilities: b.total_liabilities,
-        equity: b.equity,
-        illiquid_assets: b.illiquid_assets || 0,
-        external_liabilities: b.external_liabilities || 0,
-        interbank_assets: b.interbank_assets || {},
-        interbank_liabilities: b.interbank_liabilities || {},
-        debtrank: b.debtrank || 0,
-        last_updated_timestep: data.timestep,
+        tier: b.tier ?? 2,
+        capital_ratio: b.capital_ratio ?? 0,
+        stress: 0,
+        status: b.status ?? 'active',
+        cash: b.cash ?? 0,
+        equity: b.equity ?? 0,
+        total_assets: 0,
+        total_liabilities: 0,
+        illiquid_assets: 0,
+        external_liabilities: 0,
+        interbank_assets: {},
+        interbank_liabilities: {},
+        debtrank: 0,
+        last_updated_timestep: step,
       };
     });
 
+    // Extract network + market metrics
+    const net = data.network || {};
+    const mkt = data.market || {};
+
+    // Update basic metrics
+    const metricsUpdate = {
+      liquidity: mkt.liquidity_index ?? net.avg_capital_ratio ?? null,
+      default_rate: net.num_banks > 0 ? (net.num_defaulted ?? 0) / net.num_banks : null,
+      equilibrium_score: net.avg_capital_ratio ? Math.min(1, net.avg_capital_ratio / 0.15) : null,
+      volatility: mkt.volatility ?? null,
+    };
+
+    // Push time-series data point
+    const prev = get().timeSeriesHistory;
+    const tsUpdate = {
+      market_prices: [...prev.market_prices, mkt.asset_price ?? null].slice(-100),
+      interest_rates: [...prev.interest_rates, mkt.interest_rate ?? null].slice(-100),
+      liquidity_indices: [...prev.liquidity_indices, mkt.liquidity_index ?? null].slice(-100),
+      default_rates: [...prev.default_rates, metricsUpdate.default_rate].slice(-100),
+      system_capital_ratios: [...prev.system_capital_ratios, net.avg_capital_ratio ?? null].slice(-100),
+    };
+
+    // ─── Diff previous nodes to generate activity events ───
+    const prevNodes = get().nodes;
+    const prevNodeMap = {};
+    prevNodes.forEach((n) => { prevNodeMap[String(n.id)] = n; });
+    const newLogEntries = [];
+
+    nodes.forEach((n) => {
+      const prev = prevNodeMap[n.id];
+      if (!prev) return; // first snapshot, no diff
+
+      const cashDelta = (n.cash ?? 0) - (prev.cash ?? 0);
+      const equityDelta = (n.equity ?? 0) - (prev.equity ?? 0);
+      const crDelta = (n.capital_ratio ?? 0) - (prev.capital_ratio ?? 0);
+
+      // Detect DEFAULT
+      if (n.status === 'defaulted' && prev.status !== 'defaulted') {
+        newLogEntries.push({
+          id: `log-${step}-default-${n.id}`,
+          timestep: step,
+          type: 'DEFAULT',
+          icon: '💀',
+          message: `Bank ${n.id} DEFAULTED`,
+          detail: `Capital ratio fell to ${(n.capital_ratio * 100).toFixed(1)}%`,
+          color: '#ef4444',
+          bankId: n.id,
+        });
+      }
+      // Detect LENDING (cash decreased significantly, equity stable or up)
+      else if (cashDelta < -5 && equityDelta >= -1) {
+        newLogEntries.push({
+          id: `log-${step}-lend-${n.id}`,
+          timestep: step,
+          type: 'LEND',
+          icon: '💸',
+          message: `Bank ${n.id} LENT ₹${Math.abs(cashDelta).toFixed(0)}`,
+          detail: `Cash: ${prev.cash?.toFixed(0)} → ${n.cash?.toFixed(0)} | CR: ${(n.capital_ratio * 100).toFixed(1)}%`,
+          color: '#10b981',
+          bankId: n.id,
+        });
+      }
+      // Detect BORROWING (cash increased significantly)
+      else if (cashDelta > 5) {
+        newLogEntries.push({
+          id: `log-${step}-borrow-${n.id}`,
+          timestep: step,
+          type: 'BORROW',
+          icon: '🏦',
+          message: `Bank ${n.id} BORROWED ₹${cashDelta.toFixed(0)}`,
+          detail: `Cash: ${prev.cash?.toFixed(0)} → ${n.cash?.toFixed(0)} | CR: ${(n.capital_ratio * 100).toFixed(1)}%`,
+          color: '#3b82f6',
+          bankId: n.id,
+        });
+      }
+      // Detect FIRE SALE (equity dropped sharply)
+      else if (equityDelta < -10 && crDelta < -0.01) {
+        newLogEntries.push({
+          id: `log-${step}-firesale-${n.id}`,
+          timestep: step,
+          type: 'FIRE_SALE',
+          icon: '🔥',
+          message: `Bank ${n.id} FIRE SALE`,
+          detail: `Equity: ${prev.equity?.toFixed(0)} → ${n.equity?.toFixed(0)} (Δ${equityDelta.toFixed(0)})`,
+          color: '#f59e0b',
+          bankId: n.id,
+        });
+      }
+      // Detect HOARD (cash stable/up, no lending, capital ratio up slightly)
+      else if (cashDelta >= 0 && crDelta > 0.005) {
+        newLogEntries.push({
+          id: `log-${step}-hoard-${n.id}`,
+          timestep: step,
+          type: 'HOARD',
+          icon: '🔒',
+          message: `Bank ${n.id} HOARDING`,
+          detail: `CR: ${(prev.capital_ratio * 100).toFixed(1)}% → ${(n.capital_ratio * 100).toFixed(1)}%`,
+          color: '#f59e0b',
+          bankId: n.id,
+        });
+      }
+      // Detect stress increase
+      else if (crDelta < -0.005) {
+        newLogEntries.push({
+          id: `log-${step}-stress-${n.id}`,
+          timestep: step,
+          type: 'STRESSED',
+          icon: '⚠️',
+          message: `Bank ${n.id} under stress`,
+          detail: `CR: ${(prev.capital_ratio * 100).toFixed(1)}% → ${(n.capital_ratio * 100).toFixed(1)}% (Δ${(crDelta * 100).toFixed(1)}%)`,
+          color: '#f97316',
+          bankId: n.id,
+        });
+      }
+    });
+
+    // Also push synthetic events so the event animations fire
+    const syntheticEvents = newLogEntries
+      .filter((e) => ['DEFAULT', 'LEND', 'FIRE_SALE', 'HOARD'].includes(e.type))
+      .map((e) => ({
+        event_id: e.id,
+        event_type: e.type,
+        from: parseInt(e.bankId),
+        timestep: step,
+      }));
+
+    // Keep last 200 log entries
+    const updatedLog = [...get().activityLog, ...newLogEntries].slice(-200);
+
+    // Update node decisions from derived activity
+    const decisions = { ...get().nodeDecisions };
+    newLogEntries.forEach((e) => {
+      if (e.bankId) decisions[String(e.bankId)] = e.type;
+    });
+
     set({
-      timestep: data.timestep,
-      nodes,
+      timestep: step,
+      nodes: nodes.length > 0 ? nodes : get().nodes,
       bankHistory: newHistory,
+      metrics: metricsUpdate,
+      timeSeriesHistory: tsUpdate,
+      activityLog: updatedLog,
+      nodeDecisions: decisions,
+      events: [...get().events, ...syntheticEvents],
+      advancedMetrics: {
+        ...get().advancedMetrics,
+        network_density: net.density ?? get().advancedMetrics.network_density,
+        clustering_coefficient: net.clustering_coefficient ?? get().advancedMetrics.clustering_coefficient,
+        market_price: mkt.asset_price ?? get().advancedMetrics.market_price,
+        interest_rate: mkt.interest_rate ?? get().advancedMetrics.interest_rate,
+        liquidity_index: mkt.liquidity_index ?? get().advancedMetrics.liquidity_index,
+      },
     });
   },
 
-  // ─── Ingest network edges (from /network/topology or /api/simulation/state) ───
+  // ─── Ingest network edges (from /network/topology) with diff for activity labels ───
   ingestEdges: (edgeList) => {
-    const edges = edgeList.map((e) => ({
-      source: String(e.source),
-      target: String(e.target),
-      weight: e.weight,
-      type: e.type || 'credit',
-    }));
-    set({ edges });
+    const prevEdges = get().edges;
+    const prevEdgeMap = {};
+    prevEdges.forEach((e) => {
+      prevEdgeMap[`${e.source}-${e.target}`] = e;
+    });
+
+    const step = get().timestep;
+    const newEdgeActivity = {};
+    const edgeLogEntries = [];
+
+    const edges = edgeList.map((e) => {
+      const src = String(e.source);
+      const tgt = String(e.target);
+      const key = `${src}-${tgt}`;
+      const prevEdge = prevEdgeMap[key];
+      const weight = e.weight ?? 0;
+
+      if (prevEdge) {
+        const delta = weight - (prevEdge.weight ?? 0);
+        if (Math.abs(delta) > 0.5) {
+          const type = delta > 0 ? 'LENDING' : 'REPAYMENT';
+          const label = delta > 0
+            ? `+₹${delta.toFixed(0)}`
+            : `−₹${Math.abs(delta).toFixed(0)}`;
+          newEdgeActivity[key] = { label, type, delta, timestep: step };
+          edgeLogEntries.push({
+            id: `log-${step}-edge-${key}`,
+            timestep: step,
+            type,
+            icon: delta > 0 ? '→' : '←',
+            message: `B${src} ${delta > 0 ? '→ lent to' : '← repaid by'} B${tgt}: ₹${Math.abs(delta).toFixed(0)}`,
+            detail: `Exposure: ${prevEdge.weight?.toFixed(0)} → ${weight.toFixed(0)}`,
+            color: delta > 0 ? '#3b82f6' : '#10b981',
+          });
+        }
+      } else {
+        // New edge = new lending relationship
+        if (weight > 1) {
+          newEdgeActivity[key] = { label: `NEW ₹${weight.toFixed(0)}`, type: 'NEW_LINK', delta: weight, timestep: step };
+          edgeLogEntries.push({
+            id: `log-${step}-newedge-${key}`,
+            timestep: step,
+            type: 'NEW_LINK',
+            icon: '🔗',
+            message: `New link: B${src} → B${tgt} (₹${weight.toFixed(0)})`,
+            detail: 'New interbank lending relationship formed',
+            color: '#8b5cf6',
+          });
+        }
+      }
+
+      return {
+        source: src,
+        target: tgt,
+        weight,
+        type: e.type || 'credit',
+      };
+    });
+
+    const updatedLog = edgeLogEntries.length > 0
+      ? [...get().activityLog, ...edgeLogEntries].slice(-200)
+      : get().activityLog;
+
+    set({ edges, edgeActivity: newEdgeActivity, activityLog: updatedLog });
   },
 
-  // ─── Ingest systemic risk data ───
-  ingestSystemicRisk: (data) => {
-    // data from GET /api/analytics/systemic-risk
+  // ─── Ingest risk metrics (legacy GET /metrics/risk) ───
+  ingestRiskMetrics: (data) => {
+    // data from GET /metrics/risk — RiskAnalyzer full report
+    // May contain: debt_rank, contagion, network, health, etc.
+    const prev = get().advancedMetrics;
     set({
       advancedMetrics: {
-        aggregate_debtrank: data.debt_rank?.aggregate ?? null,
-        cascade_depth: data.contagion?.cascade_depth ?? null,
-        cascade_potential: data.contagion?.cascade_potential ?? null,
-        critical_banks: data.contagion?.critical_banks ?? [],
-        systemic_risk_index: data.health?.systemic_risk_index ?? null,
-        network_density: data.network?.density ?? null,
-        clustering_coefficient: data.network?.clustering_coefficient ?? null,
-        avg_path_length: null, // not directly in systemic-risk endpoint
-        concentration_index: data.network?.concentration_index ?? null,
-        market_price: get().advancedMetrics.market_price,
-        interest_rate: get().advancedMetrics.interest_rate,
-        market_stress_regime: data.health?.overall_status?.toUpperCase() ?? 'NORMAL',
-        liquidity_index: data.health?.liquidity_index ?? null,
-        total_losses: get().advancedMetrics.total_losses,
-        clearing_iterations: get().advancedMetrics.clearing_iterations,
-        avg_recovery_rate: get().advancedMetrics.avg_recovery_rate,
+        ...prev,
+        aggregate_debtrank: data.debt_rank?.aggregate ?? data.aggregate_debtrank ?? prev.aggregate_debtrank,
+        cascade_depth: data.contagion?.cascade_depth ?? prev.cascade_depth,
+        cascade_potential: data.contagion?.cascade_potential ?? prev.cascade_potential,
+        critical_banks: data.contagion?.critical_banks ?? prev.critical_banks,
+        systemic_risk_index: data.health?.systemic_risk_index ?? data.systemic_risk_index ?? prev.systemic_risk_index,
+        network_density: data.network?.density ?? prev.network_density,
+        clustering_coefficient: data.network?.clustering_coefficient ?? prev.clustering_coefficient,
+        avg_path_length: data.network?.avg_path_length ?? prev.avg_path_length,
+        concentration_index: data.network?.concentration_index ?? prev.concentration_index,
+        market_stress_regime: data.health?.overall_status?.toUpperCase() ?? prev.market_stress_regime,
+        total_losses: data.clearing?.total_losses ?? prev.total_losses,
+        clearing_iterations: data.clearing?.iterations ?? prev.clearing_iterations,
+        avg_recovery_rate: data.clearing?.avg_recovery_rate ?? prev.avg_recovery_rate,
       },
     });
 
     // Update bank debt ranks from individual scores
     if (data.debt_rank?.individual) {
       set({ bankDebtRanks: data.debt_rank.individual });
+    } else if (data.bank_risks) {
+      const ranks = {};
+      Object.entries(data.bank_risks).forEach(([k, v]) => {
+        ranks[String(k)] = v.debtrank ?? v.systemic_importance ?? 0;
+      });
+      set({ bankDebtRanks: ranks });
     }
   },
 
@@ -195,50 +414,31 @@ const useSimulationStore = create((set, get) => ({
     }
   },
 
-  // ─── Ingest market state ───
-  ingestMarketState: (data) => {
-    // data from GET /api/market/state or market_state in step result
-    const mkt = data.asset_market || data;
-    set((state) => ({
-      advancedMetrics: {
-        ...state.advancedMetrics,
-        market_price: mkt.price ?? mkt.asset_price ?? state.advancedMetrics.market_price,
-        interest_rate: mkt.interest_rate ?? data.lending_market?.interest_rate ?? state.advancedMetrics.interest_rate,
-        liquidity_index: data.lending_market?.liquidity ?? mkt.liquidity ?? state.advancedMetrics.liquidity_index,
-        market_stress_regime: data.market_regime?.regime ?? state.advancedMetrics.market_stress_regime,
-      },
-    }));
-  },
+  // (ingestMarketState and ingestTimeSeries removed — data now flows through ingestMetrics)
 
-  // ─── Ingest time-series from backend ───
-  ingestTimeSeries: (data) => {
-    // data from GET /api/simulation/history/timeseries
-    // { metrics, series: { metricName: { timestamps, values } }, count }
-    if (!data.series) return;
-    const ts = {};
-    if (data.series.market_price) ts.market_prices = data.series.market_price.values;
-    if (data.series.avg_capital_ratio) ts.system_capital_ratios = data.series.avg_capital_ratio.values;
-    if (data.series.default_rate) ts.default_rates = data.series.default_rate.values;
-    if (data.series.liquidity_index) ts.liquidity_indices = data.series.liquidity_index.values;
-    // interest rate may come as separate metric
-    if (data.series.interest_rate) ts.interest_rates = data.series.interest_rate.values;
-
-    set((state) => ({
-      timeSeriesHistory: { ...state.timeSeriesHistory, ...ts },
-    }));
-  },
-
-  // ─── Ingest step result metrics ───
+  // ─── Ingest step result metrics (legacy POST /simulation/step) ───
   ingestStepResult: (result) => {
-    // result from POST /api/simulation/step
-    // { steps_completed, current_step, is_done, rewards, network_stats, market_state, infrastructure }
+    // result from POST /simulation/step (legacy)
+    // { step, rewards, done, network_stats: {num_banks, num_defaulted, ...}, market_state: {asset_price, ...} }
     const m = result.network_stats || {};
+    const mkt = result.market_state || {};
+    const numBanks = m.num_banks || 30;
+
     set({
+      timestep: result.step ?? get().timestep,
       metrics: {
-        liquidity: m.avg_liquidity ?? m.avg_capital_ratio ?? null,
-        default_rate: (m.num_defaulted ?? 0) / Math.max(m.total_banks ?? 1, 1),
+        liquidity: mkt.liquidity_index ?? m.avg_capital_ratio ?? null,
+        default_rate: numBanks > 0 ? (m.num_defaulted ?? 0) / numBanks : null,
         equilibrium_score: m.avg_capital_ratio ? Math.min(1, m.avg_capital_ratio / 0.15) : null,
-        volatility: m.volatility ?? null,
+        volatility: mkt.volatility ?? null,
+      },
+      advancedMetrics: {
+        ...get().advancedMetrics,
+        network_density: m.density ?? get().advancedMetrics.network_density,
+        clustering_coefficient: m.clustering_coefficient ?? get().advancedMetrics.clustering_coefficient,
+        market_price: mkt.asset_price ?? get().advancedMetrics.market_price,
+        interest_rate: mkt.interest_rate ?? get().advancedMetrics.interest_rate,
+        liquidity_index: mkt.liquidity_index ?? get().advancedMetrics.liquidity_index,
       },
     });
   },
@@ -378,6 +578,8 @@ const useSimulationStore = create((set, get) => ({
       simStatus: 'idle',
       selectedBanks: [],
       bankHistory: {},
+      activityLog: [],
+      edgeActivity: {},
       layoutComputed: false,
       activeView: 'overview',
       nodeDecisions: {},
@@ -441,6 +643,8 @@ const useSimulationStore = create((set, get) => ({
       simStatus: 'idle',
       selectedBanks: [],
       bankHistory: {},
+      activityLog: [],
+      edgeActivity: {},
       layoutComputed: false,
       activeView: 'overview',
       nodeDecisions: {},

@@ -8,7 +8,11 @@ import * as api from '../services/api';
  * Simulation lifecycle controller.
  *
  * USE_MOCK=true  → mock engine (no backend)
- * USE_MOCK=false → real FastAPI backend with polling loop
+ * USE_MOCK=false → real FastAPI backend (legacy endpoints) with polling loop
+ *
+ * Legacy endpoints used:
+ *   POST /simulation/init, /simulation/step, /simulation/reset
+ *   GET  /metrics (full state), /metrics/risk (DebtRank), /network/topology (graph)
  */
 export default function useSimulationControl() {
   const setSimStatus = useSimulationStore((s) => s.setSimStatus);
@@ -27,53 +31,40 @@ export default function useSimulationControl() {
   const setApiLoading = useSimulationStore((s) => s.setApiLoading);
   const setApiError = useSimulationStore((s) => s.setApiError);
   const setBackendInitialized = useSimulationStore((s) => s.setBackendInitialized);
-  const ingestBackendState = useSimulationStore((s) => s.ingestBackendState);
+  const ingestMetrics = useSimulationStore((s) => s.ingestMetrics);
   const ingestEdges = useSimulationStore((s) => s.ingestEdges);
-  const ingestSystemicRisk = useSimulationStore((s) => s.ingestSystemicRisk);
-  const ingestTimeSeries = useSimulationStore((s) => s.ingestTimeSeries);
   const ingestStepResult = useSimulationStore((s) => s.ingestStepResult);
-  const ingestMarketState = useSimulationStore((s) => s.ingestMarketState);
+  const ingestRiskMetrics = useSimulationStore((s) => s.ingestRiskMetrics);
 
   // Polling ref
   const pollRef = useRef(null);
 
-  // ─── Fetch full state from backend ───
+  // ─── Fetch full state from backend (legacy endpoints) ───
   const fetchFullState = useCallback(async () => {
     try {
-      // Fetch state, topology, analytics, time series in parallel
-      const [stateRes, topoRes, riskRes, tsRes] = await Promise.allSettled([
-        api.getSimulationState(),
+      const [metricsRes, topoRes, riskRes] = await Promise.allSettled([
+        api.getMetrics(),
         api.getNetworkTopology(),
-        api.getSystemicRisk(),
-        api.getTimeSeriesData('market_price,default_rate,avg_capital_ratio,liquidity_index'),
+        api.getRiskMetrics(),
       ]);
 
-      if (stateRes.status === 'fulfilled') {
-        ingestBackendState(stateRes.value);
-        if (stateRes.value.market) ingestMarketState(stateRes.value);
+      if (metricsRes.status === 'fulfilled') {
+        ingestMetrics(metricsRes.value);
       }
-      if (topoRes.status === 'fulfilled' && topoRes.value.edges) {
-        ingestEdges(topoRes.value.edges);
+      if (topoRes.status === 'fulfilled') {
+        if (topoRes.value.edges) ingestEdges(topoRes.value.edges);
+        // Also use topology nodes if metrics didn't provide them
+        if (topoRes.value.nodes && metricsRes.status !== 'fulfilled') {
+          ingestMetrics({ banks: Object.fromEntries(topoRes.value.nodes.map(n => [n.id, n])), step: 0 });
+        }
       }
       if (riskRes.status === 'fulfilled') {
-        ingestSystemicRisk(riskRes.value);
+        ingestRiskMetrics(riskRes.value);
       }
-      if (tsRes.status === 'fulfilled') {
-        ingestTimeSeries(tsRes.value);
-      }
-
-      // Fetch events separately
-      try {
-        const eventsRes = await api.getSimulationEvents();
-        if (eventsRes.events) {
-          eventsRes.events.forEach((evt) => pushEvent(evt));
-        }
-      } catch { /* events optional */ }
-
     } catch (err) {
       console.error('[API] fetchFullState error:', err);
     }
-  }, [ingestBackendState, ingestEdges, ingestSystemicRisk, ingestTimeSeries, ingestMarketState, pushEvent]);
+  }, [ingestMetrics, ingestEdges, ingestRiskMetrics]);
 
   // ─── Poll loop: step + fetch state ───
   const startPolling = useCallback(() => {
@@ -82,14 +73,13 @@ export default function useSimulationControl() {
     const poll = async () => {
       try {
         // Step the simulation
-        const stepResult = await api.stepSimulation(1);
+        const stepResult = await api.stepSimulation();
         ingestStepResult(stepResult);
 
         // Check if done
-        if (stepResult.is_done) {
+        if (stepResult.done) {
           stopPolling();
           setSimStatus('done');
-          // Final full fetch
           await fetchFullState();
           return;
         }
@@ -106,7 +96,6 @@ export default function useSimulationControl() {
     };
 
     pollRef.current = setInterval(poll, POLL_INTERVAL);
-    // Run immediately
     poll();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchFullState, ingestStepResult, setSimStatus, setApiError]);
@@ -156,7 +145,7 @@ export default function useSimulationControl() {
 
     setApiLoading(true);
     try {
-      // Use 'normal' scenario for all frontend selections for now
+      // Initialize simulation via legacy endpoint
       await api.initSimulation({
         num_banks: 30,
         episode_length: 100,
@@ -181,7 +170,8 @@ export default function useSimulationControl() {
       setApiLoading(false);
       return false;
     }
-  }, [selectedScenario, customConfig, setSimStatus, setApiLoading, setApiError, setBackendInitialized, fetchFullState, startPolling]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedScenario, setSimStatus, setApiLoading, setApiError, setBackendInitialized, fetchFullState, startPolling]);
 
   // ─── Play ───
   const play = useCallback(async () => {
@@ -208,7 +198,7 @@ export default function useSimulationControl() {
       return true;
     }
     try {
-      const result = await api.stepSimulation(1);
+      const result = await api.stepSimulation();
       ingestStepResult(result);
       await fetchFullState();
       return true;

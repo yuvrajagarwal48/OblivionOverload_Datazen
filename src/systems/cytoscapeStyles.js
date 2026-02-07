@@ -51,6 +51,15 @@ function weightToWidth(weight) {
   return Math.max(1, Math.min(w / 10, 8));
 }
 
+function edgeTypeColor(activityType) {
+  switch (activityType) {
+    case 'LENDING': return '#3b82f6';    // blue — money flowing
+    case 'REPAYMENT': return '#10b981';  // green — repayment
+    case 'NEW_LINK': return '#8b5cf6';   // purple — new relationship
+    default: return '#cbd5e1';           // grey — static
+  }
+}
+
 /**
  * Returns the Cytoscape stylesheet array.
  * Data-driven mappers use ele.data() accessors.
@@ -129,12 +138,23 @@ export function getCytoscapeStylesheet() {
       selector: 'edge',
       style: {
         'width': (ele) => weightToWidth(ele.data('weight')),
-        'line-color': '#cbd5e1',
-        'target-arrow-color': '#cbd5e1',
+        'line-color': (ele) => edgeTypeColor(ele.data('activity_type')),
+        'target-arrow-color': (ele) => edgeTypeColor(ele.data('activity_type')),
         'target-arrow-shape': 'triangle',
         'arrow-scale': 0.8,
         'curve-style': 'bezier',
         'opacity': 0.5,
+        'label': (ele) => ele.data('activity_label') || '',
+        'font-size': '8px',
+        'font-weight': '600',
+        'color': '#e2e8f0',
+        'text-background-color': '#1e293b',
+        'text-background-opacity': 0.85,
+        'text-background-padding': '3px',
+        'text-background-shape': 'roundrectangle',
+        'text-rotation': 'autorotate',
+        'text-margin-y': -8,
+        'edge-text-rotation': 'autorotate',
         'transition-property': 'line-color, opacity, width',
         'transition-duration': '300ms',
       },

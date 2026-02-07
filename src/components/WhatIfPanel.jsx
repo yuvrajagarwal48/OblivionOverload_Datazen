@@ -83,7 +83,7 @@ export default function WhatIfPanel({ neighborNodes = [] }) {
         };
         const action = actionMap[txType] || [0, 0, 0, 1];
 
-        const data = await api.legacyWhatIf({
+        const data = await api.whatIf({
           bank_id: Number(currentBankId),
           action,
         });

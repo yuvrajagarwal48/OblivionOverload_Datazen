@@ -26,13 +26,14 @@ export default function NetworkGraph() {
   const edges = useSimulationStore((s) => s.edges);
   const events = useSimulationStore((s) => s.events);
   const nodeDecisions = useSimulationStore((s) => s.nodeDecisions || {});
+  const edgeActivity = useSimulationStore((s) => s.edgeActivity || {});
   const layoutComputed = useSimulationStore((s) => s.layoutComputed);
   const setLayoutComputed = useSimulationStore((s) => s.setLayoutComputed);
   const toggleBankSelection = useSimulationStore((s) => s.toggleBankSelection);
   const simStatus = useSimulationStore((s) => s.simStatus);
 
   // Convert backend nodes/edges to Cytoscape elements format
-  const toCyElements = useCallback((nodeList, edgeList, decisions) => {
+  const toCyElements = useCallback((nodeList, edgeList, decisions, activity) => {
     const cyNodes = nodeList.map((n) => ({
       group: 'nodes',
       data: {
@@ -47,16 +48,22 @@ export default function NetworkGraph() {
       },
     }));
 
-    const cyEdges = edgeList.map((e, i) => ({
-      group: 'edges',
-      data: {
-        id: `e-${e.source}-${e.target}-${i}`,
-        source: String(e.source),
-        target: String(e.target),
-        weight: e.weight,
-        type: e.type || 'credit',
-      },
-    }));
+    const cyEdges = edgeList.map((e, i) => {
+      const key = `${e.source}-${e.target}`;
+      const act = activity[key];
+      return {
+        group: 'edges',
+        data: {
+          id: `e-${e.source}-${e.target}-${i}`,
+          source: String(e.source),
+          target: String(e.target),
+          weight: e.weight,
+          type: e.type || 'credit',
+          activity_label: act?.label || '',
+          activity_type: act?.type || '',
+        },
+      };
+    });
 
     return [...cyNodes, ...cyEdges];
   }, []);
@@ -68,7 +75,7 @@ export default function NetworkGraph() {
 
     if (!layoutComputed) {
       // FIRST STATE_UPDATE: set elements and run layout ONCE
-      cy.json({ elements: toCyElements(nodes, edges, nodeDecisions) });
+      cy.json({ elements: toCyElements(nodes, edges, nodeDecisions, edgeActivity) });
 
       const layout = cy.layout({
         name: 'cose',
@@ -105,16 +112,20 @@ export default function NetworkGraph() {
         edges.forEach((e, i) => {
           const edgeId = `e-${e.source}-${e.target}-${i}`;
           const cyEdge = cy.getElementById(edgeId);
+          const key = `${e.source}-${e.target}`;
+          const act = edgeActivity[key];
           if (cyEdge.length) {
             cyEdge.data({
               weight: e.weight,
               type: e.type || 'credit',
+              activity_label: act?.label || '',
+              activity_type: act?.type || '',
             });
           }
         });
       });
     }
-  }, [nodes, edges, nodeDecisions, layoutComputed, setLayoutComputed, toCyElements]);
+  }, [nodes, edges, nodeDecisions, edgeActivity, layoutComputed, setLayoutComputed, toCyElements]);
 
   // Handle events — dispatch animations for new events
   useEffect(() => {

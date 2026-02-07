@@ -13,7 +13,8 @@ import InspectorPanel from './components/InspectorPanel';
 import BankDashboard from './components/BankDashboard';
 import RiskMetricsPanel from './components/RiskMetricsPanel';
 import MarketDataPanel from './components/MarketDataPanel';
-import { Zap, LogOut } from 'lucide-react';
+import ActivityLog from './components/ActivityLog';
+import { Zap, LogOut, AlertCircle } from 'lucide-react';
 import './App.css';
 
 /**
@@ -38,6 +39,7 @@ function App() {
   const simStatus = useSimulationStore((s) => s?.simStatus || 'idle');
   const timestep = useSimulationStore((s) => s?.timestep || 0);
   const currentBankData = useSimulationStore((s) => s?.currentBankData);
+  const backendInitialized = useSimulationStore((s) => s?.backendInitialized ?? false);
   const logout = useSimulationStore((s) => s?.logout);
   const apiLoading = useSimulationStore((s) => s?.apiLoading ?? false);
   const apiError = useSimulationStore((s) => s?.apiError);
@@ -46,7 +48,7 @@ function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
   const [bottomPanelOpen, setBottomPanelOpen] = useState(true);
-  const [bottomTab, setBottomTab] = useState('events'); // 'events' | 'risk' | 'market'
+  const [bottomTab, setBottomTab] = useState('activity'); // 'activity' | 'events' | 'risk' | 'market'
 
   // Activate WebSocket connection management
   useWebSocket();
@@ -168,6 +170,12 @@ function App() {
             <div className="ide-bottom-panel">
               <div className="bottom-panel-tabs">
                 <button 
+                  className={`bottom-tab ${bottomTab === 'activity' ? 'active' : ''}`}
+                  onClick={() => setBottomTab('activity')}
+                >
+                  Activity Log
+                </button>
+                <button 
                   className={`bottom-tab ${bottomTab === 'events' ? 'active' : ''}`}
                   onClick={() => setBottomTab('events')}
                 >
@@ -187,6 +195,7 @@ function App() {
                 </button>
               </div>
               <div className="bottom-panel-content">
+                {bottomTab === 'activity' && <ActivityLog />}
                 {bottomTab === 'events' && <AnalyticsPanel />}
                 {bottomTab === 'risk' && <RiskMetricsPanel />}
                 {bottomTab === 'market' && <MarketDataPanel />}
@@ -204,7 +213,21 @@ function App() {
               </span>
             </div>
             <div className="sidebar-content">
-              {restrictedMode ? <BankDashboard /> : <InspectorPanel />}
+              {restrictedMode ? (
+                backendInitialized ? (
+                  <BankDashboard />
+                ) : (
+                  <div className="panel-uninitialized">
+                    <AlertCircle size={64} className="panel-uninitialized-icon" />
+                    <div className="panel-uninitialized-title">Simulation Not Initialized</div>
+                    <div className="panel-uninitialized-text">
+                      Please initialize the simulation from the Configuration panel to view your bank dashboard.
+                    </div>
+                  </div>
+                )
+              ) : (
+                <InspectorPanel />
+              )}
             </div>
           </div>
         )}

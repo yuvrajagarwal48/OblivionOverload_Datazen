@@ -9,7 +9,7 @@ import './RiskMetricsPanel.css';
  * RiskMetricsPanel — Advanced systemic risk metrics
  * Shows DebtRank, cascade analysis, critical banks, network concentration.
  *
- * In API mode: fetches from /api/analytics/systemic-risk + /api/analytics/debtrank
+ * In API mode: fetches from GET /metrics/risk (legacy)
  * In Mock mode: reads from store (populated by mock engine)
  */
 export default function RiskMetricsPanel() {
@@ -17,8 +17,7 @@ export default function RiskMetricsPanel() {
   const bankDebtRanks = useSimulationStore((s) => s.bankDebtRanks);
   const nodes = useSimulationStore((s) => s.nodes);
   const simStatus = useSimulationStore((s) => s.simStatus);
-  const ingestSystemicRisk = useSimulationStore((s) => s.ingestSystemicRisk);
-  const ingestDebtRank = useSimulationStore((s) => s.ingestDebtRank);
+  const ingestRiskMetrics = useSimulationStore((s) => s.ingestRiskMetrics);
   const intervalRef = useRef(null);
 
   // Poll risk data from API when running in API mode
@@ -28,19 +27,15 @@ export default function RiskMetricsPanel() {
 
     const fetchRisk = async () => {
       try {
-        const [riskRes, drRes] = await Promise.allSettled([
-          api.getSystemicRisk(),
-          api.getDebtRank(),
-        ]);
-        if (riskRes.status === 'fulfilled') ingestSystemicRisk(riskRes.value);
-        if (drRes.status === 'fulfilled') ingestDebtRank(drRes.value);
+        const riskRes = await api.getRiskMetrics();
+        ingestRiskMetrics(riskRes);
       } catch { /* silent */ }
     };
 
     fetchRisk();
     intervalRef.current = setInterval(fetchRisk, 3000);
     return () => clearInterval(intervalRef.current);
-  }, [simStatus, ingestSystemicRisk, ingestDebtRank]);
+  }, [simStatus, ingestRiskMetrics]);
 
   // Get top 5 banks by DebtRank
   const topDebtRanks = Object.entries(bankDebtRanks)

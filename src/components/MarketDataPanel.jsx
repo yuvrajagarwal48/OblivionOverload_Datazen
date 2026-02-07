@@ -9,7 +9,7 @@ import './MarketDataPanel.css';
 /**
  * MarketDataPanel — Market conditions and time-series charts.
  *
- * In API mode: fetches from /api/simulation/history/timeseries + /api/market/state
+ * In API mode: fetches from GET /metrics (legacy) — market data + bank stats
  * In Mock mode: reads from store (populated by mock engine)
  */
 export default function MarketDataPanel() {
@@ -17,30 +17,25 @@ export default function MarketDataPanel() {
   const timeSeriesHistory = useSimulationStore((s) => s.timeSeriesHistory);
   const timestep = useSimulationStore((s) => s.timestep);
   const simStatus = useSimulationStore((s) => s.simStatus);
-  const ingestTimeSeries = useSimulationStore((s) => s.ingestTimeSeries);
-  const ingestMarketState = useSimulationStore((s) => s.ingestMarketState);
+  const ingestMetrics = useSimulationStore((s) => s.ingestMetrics);
   const intervalRef = useRef(null);
 
-  // Poll market / time-series data from API
+  // Poll market data from legacy /metrics endpoint
   useEffect(() => {
     if (USE_MOCK) return;
     if (simStatus !== 'running' && simStatus !== 'paused' && simStatus !== 'done') return;
 
     const fetchMarket = async () => {
       try {
-        const [tsRes, mktRes] = await Promise.allSettled([
-          api.getTimeSeriesData('market_price,default_rate,avg_capital_ratio,liquidity_index'),
-          api.getMarketState(),
-        ]);
-        if (tsRes.status === 'fulfilled') ingestTimeSeries(tsRes.value);
-        if (mktRes.status === 'fulfilled') ingestMarketState(mktRes.value);
+        const data = await api.getMetrics();
+        ingestMetrics(data);
       } catch { /* silent */ }
     };
 
     fetchMarket();
     intervalRef.current = setInterval(fetchMarket, 3000);
     return () => clearInterval(intervalRef.current);
-  }, [simStatus, ingestTimeSeries, ingestMarketState]);
+  }, [simStatus, ingestMetrics]);
 
   // Prepare chart data
   const chartData = useMemo(() => {

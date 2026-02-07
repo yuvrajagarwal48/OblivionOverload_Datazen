@@ -9,8 +9,10 @@ import './BankDashboard.css';
 /**
  * BankDashboard — Restricted view for a single logged-in bank.
  *
- * API mode: fetches from GET /api/bank/{id} for full details
- *           (balance sheet, ratios, credit risk, network position, margins)
+ * API mode: fetches from GET /metrics/bank/{id} (legacy)
+ *           returns { bank_id, tier, status, balance_sheet, capital_ratio,
+ *                     is_solvent, is_liquid, excess_cash, centrality,
+ *                     neighbors, creditors, debtors }
  * Mock mode: reads from store nodes
  */
 export default function BankDashboard() {
@@ -52,10 +54,10 @@ export default function BankDashboard() {
       const bs = bankDetails.balance_sheet || {};
       return {
         id: String(bankDetails.bank_id),
-        tier: bankDetails.tier,
-        capital_ratio: bankDetails.ratios?.capital_ratio ?? storeNode?.capital_ratio,
+        tier: bankDetails.tier ?? storeNode?.tier,
+        capital_ratio: bankDetails.capital_ratio ?? storeNode?.capital_ratio,
         stress: storeNode?.stress ?? 0,
-        status: bankDetails.status,
+        status: bankDetails.status ?? storeNode?.status,
         cash: bs.cash ?? storeNode?.cash,
         total_assets: bs.total_assets ?? storeNode?.total_assets,
         equity: bs.equity ?? storeNode?.equity,
@@ -63,13 +65,12 @@ export default function BankDashboard() {
         external_liabilities: bs.external_liabilities ?? storeNode?.external_liabilities,
         interbank_assets: bs.interbank_assets ?? storeNode?.interbank_assets ?? {},
         interbank_liabilities: bs.interbank_liabilities ?? storeNode?.interbank_liabilities ?? {},
-        debtrank: bankDetails.credit_risk?.systemic_importance ?? storeNode?.debtrank ?? 0,
-        // Extra API-only fields
-        liquidity_ratio: bankDetails.ratios?.liquidity_ratio,
-        leverage_ratio: bankDetails.ratios?.leverage_ratio,
-        probability_of_default: bankDetails.credit_risk?.probability_of_default,
-        expected_loss: bankDetails.credit_risk?.expected_loss,
-        rating: bankDetails.credit_risk?.rating,
+        debtrank: storeNode?.debtrank ?? 0,
+        // Legacy-specific fields
+        is_solvent: bankDetails.is_solvent,
+        is_liquid: bankDetails.is_liquid,
+        excess_cash: bankDetails.excess_cash,
+        centrality: bankDetails.centrality,
       };
     }
     return storeNode;
@@ -172,24 +173,28 @@ export default function BankDashboard() {
                 format="percent"
                 color={myNode.debtrank > 0.6 ? '#ef4444' : myNode.debtrank > 0.3 ? '#f59e0b' : '#10b981'}
               />
-              {/* API-only credit risk fields */}
-              {myNode.probability_of_default != null && (
+              {/* API-only fields from legacy endpoint */}
+              {myNode.is_solvent != null && (
                 <MetricCard
-                  label="Default Prob."
-                  value={myNode.probability_of_default}
-                  format="percent"
-                  color={myNode.probability_of_default > 0.3 ? '#ef4444' : '#10b981'}
+                  label="Solvent"
+                  value={myNode.is_solvent ? 'Yes' : 'No'}
+                  format="status"
+                  color={myNode.is_solvent ? '#10b981' : '#ef4444'}
                 />
               )}
-              {myNode.rating && (
-                <MetricCard label="Rating" value={myNode.rating} format="status" />
-              )}
-              {myNode.leverage_ratio != null && (
+              {myNode.is_liquid != null && (
                 <MetricCard
-                  label="Leverage"
-                  value={myNode.leverage_ratio}
+                  label="Liquid"
+                  value={myNode.is_liquid ? 'Yes' : 'No'}
+                  format="status"
+                  color={myNode.is_liquid ? '#10b981' : '#ef4444'}
+                />
+              )}
+              {myNode.centrality != null && (
+                <MetricCard
+                  label="Centrality"
+                  value={myNode.centrality}
                   format="decimal"
-                  color={myNode.leverage_ratio > 15 ? '#ef4444' : '#10b981'}
                 />
               )}
             </div>
