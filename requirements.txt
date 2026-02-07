@@ -21,10 +21,6 @@ pandas>=2.0.0
 # Visualization (for analytics, optional)
 matplotlib>=3.7.0
 
-# Gen AI & LLM
-google-generativeai>=0.3.0
-python-dotenv>=1.0.0
-
 # Utilities
 tqdm>=4.65.0
 typing-extensions>=4.5.0

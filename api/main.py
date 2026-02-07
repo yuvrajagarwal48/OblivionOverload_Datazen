@@ -24,6 +24,16 @@ from src.decision_support import DecisionSupport
 from src.learning import MAPPOTrainer, TrainingConfig
 from src.utils import load_config
 
+# Import API routers
+from api.routes import (
+    simulation_router,
+    banks_router,
+    analytics_router,
+    market_router,
+    infrastructure_router,
+    whatif_router
+)
+
 
 # Pydantic Models for API
 class SimulationConfig(BaseModel):
@@ -141,6 +151,14 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    
+    # Register modular routers (routers already have their own prefixes like /simulation, /bank, etc.)
+    app.include_router(simulation_router, prefix="/api", tags=["Simulation"])
+    app.include_router(banks_router, prefix="/api", tags=["Banks"])
+    app.include_router(analytics_router, prefix="/api", tags=["Analytics"])
+    app.include_router(market_router, prefix="/api", tags=["Market"])
+    app.include_router(infrastructure_router, prefix="/api", tags=["Infrastructure"])
+    app.include_router(whatif_router, prefix="/api", tags=["What-If Analysis"])
     
     return app
 
