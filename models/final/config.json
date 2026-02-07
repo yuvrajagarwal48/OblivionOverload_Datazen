@@ -1,0 +1,57 @@
+{
+  "training_config": {
+    "num_banks": 30,
+    "episode_length": 100,
+    "num_episodes": 10,
+    "parallel_envs": 4,
+    "checkpoint_interval": 50,
+    "actor_hidden_dims": [
+      64,
+      64
+    ],
+    "critic_hidden_dims": [
+      256,
+      256
+    ],
+    "learning_rate": 0.0003,
+    "gamma": 0.99,
+    "gae_lambda": 0.95,
+    "clip_epsilon": 0.2,
+    "entropy_coef_start": 0.01,
+    "entropy_coef_end": 0.001,
+    "entropy_decay_steps": 50000,
+    "max_grad_norm": 0.5,
+    "batch_size": 64,
+    "update_epochs": 4,
+    "curriculum_enabled": true,
+    "curriculum_stages": [
+      {
+        "name": "no_shocks",
+        "shock_probability": 0.0,
+        "duration_episodes": 200
+      },
+      {
+        "name": "mild_shocks",
+        "shock_probability": 0.1,
+        "shock_magnitude": 0.1,
+        "duration_episodes": 300
+      },
+      {
+        "name": "severe_crises",
+        "shock_probability": 0.2,
+        "shock_magnitude": 0.3,
+        "duration_episodes": 500
+      }
+    ],
+    "agent_freeze_fraction": 0.2,
+    "freeze_interval": 10,
+    "warmup_episodes": 50,
+    "save_dir": "models",
+    "log_dir": "logs",
+    "device": "cpu",
+    "seed": 42
+  },
+  "total_steps": 1000,
+  "current_episode": 9,
+  "timestamp": "2026-02-07T15:48:57.665548"
+}

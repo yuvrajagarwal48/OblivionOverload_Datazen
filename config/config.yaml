@@ -1,0 +1,122 @@
+# FinSim-MAPPO Configuration
+
+# Network Parameters
+network:
+  num_banks: 30
+  edges_per_node: 2
+  core_fraction: 0.2
+  seed: 42
+
+# Bank Initialization
+bank:
+  initial_cash_range: [100, 500]
+  initial_assets_range: [200, 1000]
+  initial_external_liabilities_range: [50, 300]
+  min_capital_ratio: 0.08
+  target_capital_ratio: 0.12
+
+# Market Parameters
+market:
+  initial_asset_price: 1.0
+  price_impact_kappa: 0.001
+  min_price_floor: 0.1
+  max_sell_limit: 0.3
+  interest_rate: 0.05
+  volatility_base: 0.02
+
+# Clearing Mechanism
+clearing:
+  max_iterations: 100
+  convergence_threshold: 1e-6
+  recovery_rate_floor: 0.0
+
+# Simulation
+simulation:
+  episode_length: 100
+  num_episodes: 1000
+  parallel_envs: 4
+  checkpoint_interval: 50
+
+# MAPPO Hyperparameters
+mappo:
+  actor_hidden_dims: [64, 64]
+  critic_hidden_dims: [256, 256]
+  learning_rate: 0.0003
+  gamma: 0.99
+  gae_lambda: 0.95
+  clip_epsilon: 0.2
+  entropy_coef_start: 0.01
+  entropy_coef_end: 0.001
+  entropy_decay_steps: 50000
+  max_grad_norm: 0.5
+  batch_size: 64
+  update_epochs: 4
+
+# Reward Parameters
+reward:
+  profit_weight: 1.0
+  liquidity_weight: 0.1
+  default_penalty: 100.0
+  system_risk_weight: 50.0
+
+# Curriculum Learning
+curriculum:
+  stages:
+    - name: "no_shocks"
+      shock_probability: 0.0
+      duration_episodes: 200
+    - name: "mild_shocks"
+      shock_probability: 0.1
+      shock_magnitude: 0.1
+      duration_episodes: 300
+    - name: "severe_crises"
+      shock_probability: 0.2
+      shock_magnitude: 0.3
+      duration_episodes: 500
+
+# Training Stabilization
+training:
+  agent_freeze_fraction: 0.2
+  freeze_interval: 10
+  warmup_episodes: 50
+
+# Scenarios
+scenarios:
+  normal:
+    shock_probability: 0.05
+    shock_magnitude: 0.05
+    liquidity_stress: 0.0
+    price_volatility: 0.02
+  liquidity_crisis:
+    shock_probability: 0.3
+    shock_magnitude: 0.2
+    liquidity_stress: 0.5
+    price_volatility: 0.05
+  asset_crash:
+    shock_probability: 0.4
+    shock_magnitude: 0.4
+    liquidity_stress: 0.2
+    price_volatility: 0.15
+  systemic:
+    shock_probability: 0.5
+    shock_magnitude: 0.5
+    liquidity_stress: 0.6
+    price_volatility: 0.2
+
+# API Settings
+api:
+  host: "0.0.0.0"
+  port: 8000
+  debug: true
+
+# Logging
+logging:
+  level: "INFO"
+  save_logs: true
+  log_dir: "logs"
+
+# Model Persistence
+models:
+  save_dir: "models"
+  load_pretrained: false
+  pretrained_path: null
