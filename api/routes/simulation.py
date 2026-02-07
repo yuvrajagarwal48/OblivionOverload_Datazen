@@ -438,3 +438,208 @@ async def get_simulation_events(
         "count": len(all_events),
         "events": all_events
     }
+
+
+@router.get("/history/graph-animation")
+async def get_graph_animation_data(
+    start: int = Query(default=0, ge=0, description="Start timestep"),
+    end: Optional[int] = Query(default=None, description="End timestep (inclusive)"),
+    sample_rate: int = Query(default=1, ge=1, description="Sample every Nth step")
+) -> Dict[str, Any]:
+    """
+    Get network graph state at each timestep for frontend animation.
+    
+    Returns nodes and edges for each timestep, allowing the frontend to:
+    - Animate network evolution over time
+    - Show defaults propagating through the system
+    - Visualize edge weight changes
+    - Display node stress levels changing
+    
+    Example usage:
+        GET /api/simulation/history/graph-animation?start=0&end=50&sample_rate=5
+        Returns graph data for steps 0, 5, 10, 15, ..., 50
+    
+    Args:
+        start: Starting timestep
+        end: Ending timestep (None = all available steps)
+        sample_rate: Sample every Nth step (1 = every step, 2 = every other step)
+    
+    Returns:
+        {
+            "timesteps": [
+                {
+                    "step": 0,
+                    "nodes": [...],  # Bank states with vis.js properties
+                    "edges": [...],  # Interbank exposures with visual properties
+                    "metrics": {...} # System-wide metrics
+                }
+            ],
+            "metadata": {...},
+            "animation_config": {...}  # Recommended animation settings
+        }
+    """
+    if not simulation_state.is_initialized():
+        raise HTTPException(status_code=400, detail="Simulation not initialized")
+    
+    if not simulation_state.history:
+        raise HTTPException(status_code=400, detail="No history data available. Run simulation first.")
+    
+    # Determine end timestep
+    max_step = simulation_state.current_step
+    if end is None or end > max_step:
+        end = max_step
+    
+    # Validate range
+    if start > end:
+        raise HTTPException(status_code=400, detail="Start must be <= end")
+    
+    # Get state capture data
+    state_capture = simulation_state.history.state_capture
+    
+    timesteps_data = []
+    sampled_steps = 0
+    
+    for step in range(start, end + 1, sample_rate):
+        # Get bank snapshots for this timestep
+        bank_snapshots = {}
+        for bank_id, snapshots in state_capture.bank_snapshots.items():
+            # Find snapshot for this timestep
+            for snapshot in snapshots:
+                if snapshot.timestep == step:
+                    bank_snapshots[bank_id] = snapshot
+                    break
+        
+        if not bank_snapshots:
+            continue  # Skip if no data for this timestep
+        
+        # Build nodes
+        nodes = []
+        for bank_id, snapshot in bank_snapshots.items():
+            # Status to color mapping
+            color_map = {
+                "healthy": "#4CAF50",    # Green
+                "stressed": "#FF9800",   # Orange
+                "critical": "#FF5722",   # Deep orange
+                "defaulted": "#F44336"   # Red
+            }
+            
+            # Size based on total assets (log scale)
+            size = max(5, min(50, snapshot.viz_size * 10))
+            
+            nodes.append({
+                "id": bank_id,
+                "label": f"Bank {bank_id}",
+                
+                # Status
+                "status": snapshot.solvency_status,
+                "tier": snapshot.tier,
+                
+                # Financial metrics (for tooltips)
+                "equity": round(snapshot.equity, 2),
+                "capital_ratio": round(snapshot.capital_ratio, 4),
+                "liquidity_ratio": round(snapshot.liquidity_ratio, 4),
+                "cash": round(snapshot.cash_position, 2),
+                "total_assets": round(snapshot.total_assets, 2),
+                "total_liabilities": round(snapshot.total_liabilities, 2),
+                
+                # Lending activity
+                "outstanding_lending": round(snapshot.outstanding_lending, 2),
+                "outstanding_borrowing": round(snapshot.outstanding_borrowing, 2),
+                "net_position": round(snapshot.net_interbank_position, 2),
+                
+                # Risk metrics
+                "stress_level": round(snapshot.stress_level, 3),
+                "exposure": round(snapshot.total_exposure, 2),
+                "exposure_to_defaults": round(snapshot.exposure_to_defaults, 2),
+                "concentration": round(snapshot.concentration_index, 3),
+                
+                # Network position
+                "degree_centrality": round(snapshot.degree_centrality, 4),
+                "betweenness_centrality": round(snapshot.betweenness_centrality, 4),
+                
+                # Visualization properties
+                "size": size,
+                "color": color_map.get(snapshot.solvency_status, "#9E9E9E"),
+                "color_intensity": snapshot.viz_color_intensity,
+                "border_width": 3 if snapshot.solvency_status == "defaulted" else (2 if snapshot.solvency_status == "stressed" else 1),
+                "border_color": "#000000" if snapshot.solvency_status == "defaulted" else "#666666",
+                
+                # Animation properties
+                "opacity": 0.3 if snapshot.solvency_status == "defaulted" else 1.0,
+                "pulse": snapshot.solvency_status == "stressed"  # Frontend can animate pulsing
+            })
+        
+        # Build edges
+        edges = []
+        
+        # If this is the current step, we can get actual edges
+        if step == simulation_state.current_step and simulation_state.env:
+            network = simulation_state.env.network
+            for u, v in network.graph.edges():
+                exposure = network.liability_matrix[u, v]
+                if exposure > 0:
+                    # Get debtor and creditor status
+                    debtor_snapshot = bank_snapshots.get(u)
+                    creditor_snapshot = bank_snapshots.get(v)
+                    
+                    # Color edge based on risk
+                    if debtor_snapshot and debtor_snapshot.solvency_status == "defaulted":
+                        edge_color = "#F44336"  # Red - defaulted debtor
+                    elif debtor_snapshot and debtor_snapshot.solvency_status == "stressed":
+                        edge_color = "#FF9800"  # Orange - stressed debtor
+                    else:
+                        edge_color = "#2196F3"  # Blue - healthy
+                    
+                    edges.append({
+                        "from": u,
+                        "to": v,
+                        "value": round(exposure, 2),
+                        "label": f"${exposure:,.0f}",
+                        "width": max(1, min(exposure / 100000, 10)),
+                        "color": edge_color,
+                        "arrows": "to",
+                        "dashes": debtor_snapshot.solvency_status == "defaulted" if debtor_snapshot else False
+                    })
+        
+        # Get system metrics for this timestep
+        step_history = next((h for h in simulation_state.step_history if h.timestep == step), None)
+        
+        metrics = {}
+        if step_history:
+            metrics = {
+                "total_defaults": step_history.total_defaults,
+                "num_stressed": step_history.num_stressed,
+                "num_active": simulation_state.num_banks - step_history.total_defaults,
+                "avg_capital_ratio": round(step_history.avg_capital_ratio, 4),
+                "market_price": round(step_history.market_price, 4),
+                "volatility": round(step_history.volatility, 4),
+                "liquidity_index": round(step_history.liquidity_index, 4),
+                "total_exposure": round(step_history.total_exposure, 2)
+            }
+        
+        timesteps_data.append({
+            "step": step,
+            "nodes": nodes,
+            "edges": edges,
+            "metrics": metrics,
+            "timestamp": bank_snapshots[list(bank_snapshots.keys())[0]].timestamp if bank_snapshots else None
+        })
+        
+        sampled_steps += 1
+    
+    return {
+        "timesteps": timesteps_data,
+        "metadata": {
+            "total_steps": max_step + 1,
+            "sampled_steps": sampled_steps,
+            "sample_rate": sample_rate,
+            "start": start,
+            "end": end,
+            "num_banks": simulation_state.num_banks
+        },
+        "animation_config": {
+            "recommended_fps": 2 if sample_rate == 1 else 5,  # Frames per second
+            "transition_duration_ms": 500,  # Smooth transitions
+            "layout": "force-directed"  # Recommended layout algorithm
+        }
+    }
