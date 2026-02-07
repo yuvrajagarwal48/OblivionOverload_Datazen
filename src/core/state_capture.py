@@ -135,9 +135,9 @@ class BankSnapshot:
             leverage_ratio=leverage,
             total_assets=bs.total_assets,
             total_liabilities=bs.total_liabilities,
-            outstanding_lending=bs.interbank_assets,
-            outstanding_borrowing=bs.interbank_liabilities,
-            net_interbank_position=bs.interbank_assets - bs.interbank_liabilities,
+            outstanding_lending=sum(bs.interbank_assets.values()) if isinstance(bs.interbank_assets, dict) else bs.interbank_assets,
+            outstanding_borrowing=sum(bs.interbank_liabilities.values()) if isinstance(bs.interbank_liabilities, dict) else bs.interbank_liabilities,
+            net_interbank_position=(sum(bs.interbank_assets.values()) if isinstance(bs.interbank_assets, dict) else bs.interbank_assets) - (sum(bs.interbank_liabilities.values()) if isinstance(bs.interbank_liabilities, dict) else bs.interbank_liabilities),
             posted_margins=getattr(bank, 'posted_margins', 0),
             collateral_held=getattr(bank, 'collateral_held', 0),
             margin_coverage_ratio=getattr(bank, 'margin_coverage', 1.0),
@@ -206,8 +206,9 @@ class ExchangeSnapshot:
         """Create snapshot from Exchange object."""
         state = exchange.get_state() if hasattr(exchange, 'get_state') else None
         
-        volume = getattr(exchange, 'total_volume', 0)
-        count = getattr(exchange, 'transaction_count', 0)
+        volume = getattr(exchange, 'current_volume', getattr(exchange, 'total_volume', 0))
+        count = getattr(exchange, 'total_orders_processed', getattr(exchange, 'transaction_count', 0))
+        congestion = getattr(exchange, 'congestion_level', getattr(exchange, 'congestion', 0.0))
         
         return cls(
             exchange_id=exchange.exchange_id,
@@ -216,22 +217,22 @@ class ExchangeSnapshot:
             transaction_volume=volume,
             transaction_count=count,
             average_transaction_size=volume / max(count, 1),
-            max_throughput=exchange.config.max_throughput if hasattr(exchange, 'config') else 1000,
+            max_throughput=getattr(exchange.config, 'max_throughput', getattr(exchange.config, 'base_capacity', 1000)) if hasattr(exchange, 'config') else 1000,
             capacity_utilization=getattr(exchange, 'capacity_utilization', 0),
-            congestion_level=exchange.congestion,
-            order_backlog=len(getattr(exchange, 'order_book', [])),
+            congestion_level=congestion,
+            order_backlog=len(getattr(exchange, 'order_book', {})),
             queue_depth=getattr(exchange, 'queue_depth', 0),
             average_settlement_delay=getattr(exchange, 'avg_delay', 0),
             max_settlement_delay=getattr(exchange, 'max_delay', 0),
             pending_settlements=len(getattr(exchange, 'pending_settlements', [])),
-            total_fees_collected=getattr(exchange, 'total_fees', 0),
+            total_fees_collected=getattr(exchange, 'total_fees_collected', getattr(exchange, 'total_fees', 0)),
             effective_fee_rate=exchange.get_fee_rate() if hasattr(exchange, 'get_fee_rate') else 0.001,
             market_volatility=getattr(exchange, 'volatility', 0.02),
             bid_ask_spread=getattr(exchange, 'spread', 0.001),
-            is_stressed=exchange.congestion > 0.8,
+            is_stressed=congestion > 0.8,
             circuit_breaker_active=getattr(exchange, 'circuit_breaker', False),
             viz_size=np.log1p(volume) / 10,
-            viz_color_intensity=exchange.congestion
+            viz_color_intensity=congestion
         )
 
 
@@ -295,7 +296,7 @@ class CCPSnapshot:
         ) if hasattr(ccp, 'margin_accounts') else 0
         
         collateral = sum(
-            ma.collateral_posted for ma in ccp.margin_accounts.values()
+            getattr(ma, 'total_margin', ma.initial_margin + ma.variation_margin) for ma in ccp.margin_accounts.values()
         ) if hasattr(ccp, 'margin_accounts') else 0
         
         default_fund = sum(
@@ -305,11 +306,12 @@ class CCPSnapshot:
         # Distressed members
         distressed = sum(
             1 for ma in ccp.margin_accounts.values()
-            if ma.collateral_posted < ma.initial_margin
+            if getattr(ma, 'total_margin', ma.initial_margin + ma.variation_margin) < ma.initial_margin
         ) if hasattr(ccp, 'margin_accounts') else 0
         
         # Coverage ratios (simplified)
-        total_resources = collateral + default_fund + ccp.capital
+        ccp_capital = getattr(ccp, 'ccp_capital', getattr(ccp, 'capital', 0))
+        total_resources = collateral + default_fund + ccp_capital
         gross_exp = getattr(ccp, 'gross_exposure', 0)
         net_exp = getattr(ccp, 'net_exposure', 0)
         
@@ -323,7 +325,7 @@ class CCPSnapshot:
             initial_margin_total=initial_margin,
             variation_margin_total=variation_margin,
             default_fund_balance=default_fund,
-            ccp_capital_buffer=ccp.capital,
+            ccp_capital_buffer=ccp_capital,
             total_prefunded_resources=total_resources,
             gross_exposure=gross_exp,
             net_exposure=net_exp,

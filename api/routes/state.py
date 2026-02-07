@@ -254,11 +254,11 @@ class SimulationState:
             volatility=market_state.volatility,
             liquidity_index=market_state.liquidity_index,
             total_defaults=network_stats.num_defaulted,
-            default_rate=network_stats.default_rate,
+            default_rate=network_stats.num_defaulted / max(network_stats.num_banks, 1),
             num_stressed=network_stats.num_stressed,
-            total_exposure=network_stats.total_interbank_exposure,
+            total_exposure=network_stats.total_exposure,
             avg_capital_ratio=network_stats.avg_capital_ratio,
-            network_density=network_stats.network_density,
+            network_density=network_stats.density,
             bank_states=bank_states
         )
         

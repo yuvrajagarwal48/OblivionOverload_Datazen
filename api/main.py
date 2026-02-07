@@ -31,7 +31,8 @@ from api.routes import (
     analytics_router,
     market_router,
     infrastructure_router,
-    whatif_router
+    whatif_router,
+    ai_insights_router
 )
 
 
@@ -159,6 +160,7 @@ def create_app() -> FastAPI:
     app.include_router(market_router, prefix="/api", tags=["Market"])
     app.include_router(infrastructure_router, prefix="/api", tags=["Infrastructure"])
     app.include_router(whatif_router, prefix="/api", tags=["What-If Analysis"])
+    app.include_router(ai_insights_router, prefix="/api", tags=["AI Insights"])
     
     return app
 
