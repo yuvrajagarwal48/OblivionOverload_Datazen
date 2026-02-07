@@ -1,0 +1,254 @@
+/* ═══════════════════════════════════════════════
+   Risk Metrics Panel
+   ═══════════════════════════════════════════════ */
+
+.risk-metrics-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 20px;
+  height: 100%;
+  overflow-y: auto;
+  background: #0f172a;
+}
+
+.risk-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.risk-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: #f1f5f9;
+  margin: 0;
+}
+
+/* Risk Cards Grid */
+.risk-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.risk-card {
+  padding: 14px;
+  background: #1e293b;
+  border: 1px solid;
+  border-radius: 10px;
+  transition: all 0.2s;
+}
+
+.risk-card.severity-good {
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.risk-card.severity-warning {
+  border-color: rgba(245, 158, 11, 0.4);
+}
+
+.risk-card.severity-critical {
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
+.risk-card.severity-neutral {
+  border-color: #334155;
+}
+
+.risk-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  color: #94a3b8;
+}
+
+.risk-card-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.risk-card-value {
+  font-size: 24px;
+  font-weight: 800;
+  color: #e2e8f0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Sections */
+.risk-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.risk-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin: 0;
+}
+
+/* Network Metrics Grid */
+.network-metrics-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.metric-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+}
+
+.metric-row-label {
+  font-size: 12px;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.metric-row-value {
+  font-size: 13px;
+  font-weight: 700;
+  color: #e2e8f0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* DebtRank List */
+.debtrank-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.debtrank-item {
+  display: grid;
+  grid-template-columns: 40px 1fr auto 60px;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+
+.debtrank-item:hover {
+  border-color: #475569;
+  background: #1e293b;
+}
+
+.debtrank-rank {
+  font-size: 14px;
+  font-weight: 800;
+  color: #3b82f6;
+  font-variant-numeric: tabular-nums;
+}
+
+.debtrank-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.debtrank-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+.debtrank-tier {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #0f172a;
+  color: #94a3b8;
+}
+
+.debtrank-bar-container {
+  width: 100px;
+  height: 6px;
+  background: #0f172a;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.debtrank-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6, #2563eb);
+  transition: width 0.3s;
+}
+
+.debtrank-value {
+  font-size: 12px;
+  font-weight: 700;
+  color: #60a5fa;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.debtrank-empty {
+  padding: 20px;
+  text-align: center;
+  color: #475569;
+  font-size: 13px;
+  font-style: italic;
+}
+
+/* Critical Banks Alert */
+.critical-alert {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 8px;
+  color: #fca5a5;
+}
+
+.critical-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.critical-banks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.critical-bank-badge {
+  padding: 4px 10px;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #ef4444;
+}
+
+/* Scrollbar */
+.risk-metrics-panel::-webkit-scrollbar {
+  width: 4px;
+}
+
+.risk-metrics-panel::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 2px;
+}

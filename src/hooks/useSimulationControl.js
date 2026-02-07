@@ -14,6 +14,9 @@ export default function useSimulationControl() {
   const setStateUpdate = useSimulationStore((s) => s.setStateUpdate);
   const pushEvent = useSimulationStore((s) => s.pushEvent);
   const setMetrics = useSimulationStore((s) => s.setMetrics);
+  const setAdvancedMetrics = useSimulationStore((s) => s.setAdvancedMetrics);
+  const pushTimeSeriesData = useSimulationStore((s) => s.pushTimeSeriesData);
+  const setBankDebtRanks = useSimulationStore((s) => s.setBankDebtRanks);
   const resetAll = useSimulationStore((s) => s.resetAll);
   const selectedScenario = useSimulationStore((s) => s.selectedScenario);
   const customConfig = useSimulationStore((s) => s.customConfig);
@@ -54,6 +57,9 @@ export default function useSimulationControl() {
       if (event.bank) setNodeDecision(event.bank, event.event_type);
     };
     mock.onMetricsUpdate = (payload) => setMetrics(payload);
+    mock.onAdvancedMetricsUpdate = (payload) => setAdvancedMetrics(payload);
+    mock.onTimeSeriesUpdate = (data) => pushTimeSeriesData(data);
+    mock.onDebtRankUpdate = (payload) => setBankDebtRanks(payload);
     mock.onComplete = () => setSimStatus('done');
 
     mock.start(scenario, scenario === 'custom' ? customConfig : null);

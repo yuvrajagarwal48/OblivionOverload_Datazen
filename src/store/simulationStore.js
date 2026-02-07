@@ -14,6 +14,51 @@ const useSimulationStore = create((set, get) => ({
   },
   timestep: 0,
 
+  // ─── Advanced Metrics ───
+  advancedMetrics: {
+    // Systemic Risk
+    aggregate_debtrank: null,
+    cascade_depth: null,
+    cascade_potential: null,
+    critical_banks: [],
+    systemic_risk_index: null,
+    
+    // Network
+    network_density: null,
+    clustering_coefficient: null,
+    avg_path_length: null,
+    concentration_index: null,
+    
+    // Market
+    market_price: null,
+    interest_rate: null,
+    market_stress_regime: 'NORMAL',
+    liquidity_index: null,
+    
+    // Clearing
+    total_losses: null,
+    clearing_iterations: null,
+    avg_recovery_rate: null,
+  },
+
+  // ─── Time Series History ───
+  timeSeriesHistory: {
+    market_prices: [],
+    interest_rates: [],
+    liquidity_indices: [],
+    default_rates: [],
+    system_capital_ratios: [],
+  },
+
+  // ─── Per-Bank DebtRank ───
+  bankDebtRanks: {}, // { [bankId]: debtrank_value }
+
+  // ─── Auth State ───
+  isAuthenticated: false,
+  currentBankId: null,
+  currentBankData: null,
+  restrictedMode: false,
+
   // ─── UI State ───
   showLanding: true,
   simStatus: 'idle', // idle | running | paused | done
@@ -80,6 +125,26 @@ const useSimulationStore = create((set, get) => ({
     set({ metrics: payload });
   },
 
+  setAdvancedMetrics: (payload) => {
+    set({ advancedMetrics: payload });
+  },
+
+  pushTimeSeriesData: (data) => {
+    set((state) => ({
+      timeSeriesHistory: {
+        market_prices: [...state.timeSeriesHistory.market_prices, data.market_price].slice(-100),
+        interest_rates: [...state.timeSeriesHistory.interest_rates, data.interest_rate].slice(-100),
+        liquidity_indices: [...state.timeSeriesHistory.liquidity_indices, data.liquidity_index].slice(-100),
+        default_rates: [...state.timeSeriesHistory.default_rates, data.default_rate].slice(-100),
+        system_capital_ratios: [...state.timeSeriesHistory.system_capital_ratios, data.system_capital_ratio].slice(-100),
+      },
+    }));
+  },
+
+  setBankDebtRanks: (payload) => {
+    set({ bankDebtRanks: payload });
+  },
+
   // ─── Actions: Simulation Control ───
   setSimStatus: (status) => set({ simStatus: status }),
 
@@ -121,6 +186,67 @@ const useSimulationStore = create((set, get) => ({
   toggleBankView: () => set((state) => ({ bankViewOpen: !state.bankViewOpen })),
   setBankViewOpen: (open) => set({ bankViewOpen: open }),
 
+  // ─── Actions: Auth ───
+  setAuth: ({ isAuthenticated, currentBankId, currentBankData, restrictedMode }) =>
+    set({
+      isAuthenticated,
+      currentBankId,
+      currentBankData,
+      restrictedMode,
+      showLanding: false, // skip landing after login
+    }),
+
+  logout: () =>
+    set({
+      isAuthenticated: false,
+      currentBankId: null,
+      currentBankData: null,
+      restrictedMode: false,
+      showLanding: true,
+      nodes: [],
+      edges: [],
+      events: [],
+      metrics: {
+        liquidity: null,
+        default_rate: null,
+        equilibrium_score: null,
+        volatility: null,
+      },
+      timestep: 0,
+      simStatus: 'idle',
+      selectedBanks: [],
+      bankHistory: {},
+      layoutComputed: false,
+      activeView: 'overview',
+      nodeDecisions: {},
+      advancedMetrics: {
+        aggregate_debtrank: null,
+        cascade_depth: null,
+        cascade_potential: null,
+        critical_banks: [],
+        systemic_risk_index: null,
+        network_density: null,
+        clustering_coefficient: null,
+        avg_path_length: null,
+        concentration_index: null,
+        market_price: null,
+        interest_rate: null,
+        market_stress_regime: 'NORMAL',
+        liquidity_index: null,
+        total_losses: null,
+        clearing_iterations: null,
+        avg_recovery_rate: null,
+      },
+      timeSeriesHistory: {
+        market_prices: [],
+        interest_rates: [],
+        liquidity_indices: [],
+        default_rates: [],
+        system_capital_ratios: [],
+      },
+      bankDebtRanks: {},
+    }),
+
   // ─── Actions: View Navigation ───
   setActiveView: (view) => set({ activeView: view }),
   enterApp: () => set({ showLanding: false }),
@@ -153,6 +279,32 @@ const useSimulationStore = create((set, get) => ({
       layoutComputed: false,
       activeView: 'overview',
       nodeDecisions: {},
+      advancedMetrics: {
+        aggregate_debtrank: null,
+        cascade_depth: null,
+        cascade_potential: null,
+        critical_banks: [],
+        systemic_risk_index: null,
+        network_density: null,
+        clustering_coefficient: null,
+        avg_path_length: null,
+        concentration_index: null,
+        market_price: null,
+        interest_rate: null,
+        market_stress_regime: 'NORMAL',
+        liquidity_index: null,
+        total_losses: null,
+        clearing_iterations: null,
+        avg_recovery_rate: null,
+      },
+      timeSeriesHistory: {
+        market_prices: [],
+        interest_rates: [],
+        liquidity_indices: [],
+        default_rates: [],
+        system_capital_ratios: [],
+      },
+      bankDebtRanks: {},
     }),
 }));
 

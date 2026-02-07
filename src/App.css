@@ -118,6 +118,45 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Bank name in title bar */
+.titlebar-bank-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: 4px;
+}
+
+.bank-name-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #60a5fa;
+}
+
+/* Logout button */
+.titlebar-logout-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: none;
+  border: 1px solid #334155;
+  border-radius: 4px;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.titlebar-logout-btn:hover {
+  color: #ef4444;
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.08);
+}
+
 /* ── Main Body ── */
 .ide-body {
   flex: 1;
@@ -292,8 +331,16 @@
   color: #64748b;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  cursor: default;
+  background: none;
+  border: none;
+  font-family: inherit;
+  cursor: pointer;
   position: relative;
+  transition: color 0.2s;
+}
+
+.bottom-tab:hover {
+  color: #94a3b8;
 }
 
 .bottom-tab.active {

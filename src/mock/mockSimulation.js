@@ -17,13 +17,29 @@ function generateNetwork(scenario) {
 
   for (let i = 1; i <= config.numBanks; i++) {
     const tier = i <= config.tier1Count ? 1 : i <= config.tier1Count + config.tier2Count ? 2 : 3;
+    const baseCapital = tier === 1 ? 0.12 : 0.10;
+    const capital_ratio = baseCapital + Math.random() * 0.08;
+    const total_assets = tier === 1 ? 5000 + Math.random() * 3000 : 2000 + Math.random() * 1500;
+    const equity = total_assets * capital_ratio;
+    const cash = total_assets * (0.15 + Math.random() * 0.10);
+    const illiquid_assets = total_assets * (0.5 + Math.random() * 0.2);
+    
     nodes.push({
       id: String(i),
       tier,
-      capital_ratio: 0.10 + Math.random() * 0.10, // 0.10–0.20
-      stress: 0.05 + Math.random() * 0.15,         // 0.05–0.20
+      capital_ratio,
+      stress: 0.05 + Math.random() * 0.15,
       status: 'active',
       last_updated_timestep: 0,
+      // Full balance sheet
+      cash,
+      illiquid_assets,
+      total_assets,
+      equity,
+      external_liabilities: total_assets * (0.3 + Math.random() * 0.2),
+      interbank_assets: {},
+      interbank_liabilities: {},
+      debtrank: 0,
     });
   }
 
@@ -49,6 +65,15 @@ function generateNetwork(scenario) {
       weight: 10 + Math.floor(Math.random() * 80),
       type: 'credit',
     });
+    
+    // Update interbank exposures on nodes
+    const srcNode = nodes.find(n => n.id === String(src));
+    const tgtNode = nodes.find(n => n.id === String(tgt));
+    if (srcNode && tgtNode) {
+      const amount = 10 + Math.floor(Math.random() * 80);
+      srcNode.interbank_assets[String(tgt)] = (srcNode.interbank_assets[String(tgt)] || 0) + amount;
+      tgtNode.interbank_liabilities[String(src)] = (tgtNode.interbank_liabilities[String(src)] || 0) + amount;
+    }
   }
 
   return { nodes, edges };
@@ -259,7 +284,99 @@ function simulateStep(state, scenario, timestep) {
     volatility: Math.max(0, Math.min(1, avgStress * 0.8 + (defaultedCount / nodes.length) * 0.2)),
   };
 
-  return { nodes, edges, events, metrics };
+  // Compute advanced metrics
+  const advancedMetrics = computeAdvancedMetrics(nodes, edges, timestep, config);
+  
+  // Compute DebtRank for each bank
+  const debtRanks = computeDebtRanks(nodes, edges);
+
+  return { nodes, edges, events, metrics, advancedMetrics, debtRanks };
+}
+
+// ─── Advanced Metrics Computation ───
+
+function computeAdvancedMetrics(nodes, edges, timestep, config) {
+  const activeNodes = nodes.filter(n => n.status !== 'defaulted');
+  const defaultedCount = nodes.length - activeNodes.length;
+  
+  // Network metrics
+  const network_density = edges.length / (nodes.length * (nodes.length - 1));
+  const clustering_coefficient = 0.3 + Math.random() * 0.3; // Simplified
+  const avg_path_length = 2.5 + Math.random() * 1.5;
+  
+  // Concentration (simplified - sum of top 3 exposures / total)
+  const totalExposure = edges.reduce((sum, e) => sum + e.weight, 0);
+  const topExposures = edges.map(e => e.weight).sort((a, b) => b - a).slice(0, 3);
+  const concentration_index = topExposures.reduce((s, v) => s + v, 0) / (totalExposure || 1);
+  
+  // Market data (evolving over time)
+  const market_price = 100 - timestep * 0.5 - Math.random() * 5;
+  const interest_rate = 0.05 + Math.sin(timestep * 0.1) * 0.02 + defaultedCount * 0.005;
+  const liquidity_index = activeNodes.reduce((sum, n) => sum + (n.cash / n.total_assets), 0) / (activeNodes.length || 1);
+  
+  // Market stress regime
+  let market_stress_regime = 'NORMAL';
+  if (defaultedCount > nodes.length * 0.3 || liquidity_index < 0.1) {
+    market_stress_regime = 'CRISIS';
+  } else if (defaultedCount > nodes.length * 0.1 || liquidity_index < 0.15) {
+    market_stress_regime = 'STRESSED';
+  }
+  
+  // Systemic risk
+  const cascade_depth = defaultedCount > 0 ? Math.floor(1 + Math.log(defaultedCount + 1) * 2) : 0;
+  const cascade_potential = Math.min(1, defaultedCount / (nodes.length * 0.5));
+  const systemic_risk_index = (defaultedCount / nodes.length) * 0.4 + (1 - liquidity_index) * 0.3 + cascade_potential * 0.3;
+  
+  // Critical banks (tier-1 banks with high stress)
+  const critical_banks = nodes
+    .filter(n => n.tier === 1 && n.stress > 0.6 && n.status !== 'defaulted')
+    .map(n => parseInt(n.id));
+  
+  // Clearing metrics (mock)
+  const total_losses = defaultedCount * 500 + Math.random() * 200;
+  const clearing_iterations = 3 + Math.floor(Math.random() * 5);
+  const avg_recovery_rate = defaultedCount > 0 ? 0.6 + Math.random() * 0.3 : 1.0;
+  
+  // Aggregate DebtRank (sum of all individual debtranks)
+  const aggregate_debtrank = nodes.reduce((sum, n) => sum + (n.debtrank || 0), 0);
+  
+  return {
+    aggregate_debtrank,
+    cascade_depth,
+    cascade_potential,
+    critical_banks,
+    systemic_risk_index,
+    network_density,
+    clustering_coefficient,
+    avg_path_length,
+    concentration_index,
+    market_price,
+    interest_rate,
+    market_stress_regime,
+    liquidity_index,
+    total_losses,
+    clearing_iterations,
+    avg_recovery_rate,
+  };
+}
+
+function computeDebtRanks(nodes, edges) {
+  const debtRanks = {};
+  const totalAssets = nodes.reduce((sum, n) => sum + n.total_assets, 0);
+  
+  nodes.forEach(node => {
+    // Simplified DebtRank: (total interbank assets / system assets) * stress multiplier
+    const ibAssets = Object.values(node.interbank_assets || {}).reduce((s, v) => s + v, 0);
+    const baseRank = ibAssets / (totalAssets || 1);
+    const stressMultiplier = 1 + node.stress;
+    const tierMultiplier = node.tier === 1 ? 1.5 : 1.0;
+    
+    const debtrank = baseRank * stressMultiplier * tierMultiplier;
+    debtRanks[node.id] = Math.min(1, debtrank * 10); // Scale to 0-1
+    node.debtrank = debtRanks[node.id];
+  });
+  
+  return debtRanks;
 }
 
 // ─── Mock Simulation Runner ───
@@ -273,6 +390,9 @@ export class MockSimulation {
     this.onStateUpdate = null;
     this.onEvent = null;
     this.onMetricsUpdate = null;
+    this.onAdvancedMetricsUpdate = null;
+    this.onTimeSeriesUpdate = null;
+    this.onDebtRankUpdate = null;
     this.onComplete = null;
     this.maxSteps = 60;
     this.stepDelay = 800; // ms between steps
@@ -333,6 +453,23 @@ export class MockSimulation {
       equilibrium_score: 0.9 + Math.random() * 0.05,
       volatility: 0.05 + Math.random() * 0.05,
     });
+    
+    // Emit initial advanced metrics
+    const initialAdvanced = computeAdvancedMetrics(this.state.nodes, this.state.edges, 0, configForGen);
+    this._emitAdvancedMetrics(initialAdvanced);
+    
+    // Emit initial time series
+    this._emitTimeSeries({
+      market_price: initialAdvanced.market_price,
+      interest_rate: initialAdvanced.interest_rate,
+      liquidity_index: initialAdvanced.liquidity_index,
+      default_rate: 0,
+      system_capital_ratio: 0.12,
+    });
+    
+    // Emit initial debt ranks
+    const initialDebtRanks = computeDebtRanks(this.state.nodes, this.state.edges);
+    this._emitDebtRanks(initialDebtRanks);
 
     // Start stepping
     this.intervalId = setInterval(() => {
@@ -361,6 +498,23 @@ export class MockSimulation {
 
     // Emit metrics
     this._emitMetrics(result.metrics);
+    
+    // Emit advanced metrics
+    this._emitAdvancedMetrics(result.advancedMetrics);
+    
+    // Emit time series
+    const avgCapital = result.nodes.filter(n => n.status !== 'defaulted')
+      .reduce((sum, n) => sum + n.capital_ratio, 0) / (result.nodes.length || 1);
+    this._emitTimeSeries({
+      market_price: result.advancedMetrics.market_price,
+      interest_rate: result.advancedMetrics.interest_rate,
+      liquidity_index: result.advancedMetrics.liquidity_index,
+      default_rate: result.metrics.default_rate,
+      system_capital_ratio: avgCapital,
+    });
+    
+    // Emit debt ranks
+    this._emitDebtRanks(result.debtRanks);
 
     // Check completion
     const allDefaulted = result.nodes.every((n) => n.status === 'defaulted');
@@ -380,6 +534,18 @@ export class MockSimulation {
 
   _emitMetrics(metrics) {
     this.onMetricsUpdate?.(metrics);
+  }
+  
+  _emitAdvancedMetrics(advancedMetrics) {
+    this.onAdvancedMetricsUpdate?.(advancedMetrics);
+  }
+  
+  _emitTimeSeries(data) {
+    this.onTimeSeriesUpdate?.(data);
+  }
+  
+  _emitDebtRanks(debtRanks) {
+    this.onDebtRankUpdate?.(debtRanks);
   }
 
   pause() {

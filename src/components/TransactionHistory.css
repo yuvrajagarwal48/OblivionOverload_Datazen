@@ -1,0 +1,180 @@
+/* ═══════════════════════════════════════════════
+   Transaction History
+   ═══════════════════════════════════════════════ */
+
+.txhist-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.txhist-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.txhist-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin: 0;
+}
+
+.txhist-refresh-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.txhist-refresh-btn:hover {
+  color: #e2e8f0;
+  border-color: #475569;
+}
+
+@keyframes txhist-spin-anim {
+  to { transform: rotate(360deg); }
+}
+
+.txhist-spin {
+  animation: txhist-spin-anim 0.8s linear infinite;
+}
+
+/* Error & Empty */
+.txhist-error {
+  padding: 8px 12px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 6px;
+  color: #fca5a5;
+  font-size: 12px;
+}
+
+.txhist-empty {
+  padding: 16px;
+  text-align: center;
+  color: #475569;
+  font-size: 12px;
+  font-style: italic;
+}
+
+/* Table */
+.txhist-table-wrap {
+  overflow-x: auto;
+}
+
+.txhist-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.txhist-table thead th {
+  padding: 8px 10px;
+  text-align: left;
+  font-size: 10px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid #1e293b;
+  white-space: nowrap;
+}
+
+.txhist-table tbody tr {
+  border-bottom: 1px solid #1e293b;
+  transition: background 0.15s;
+}
+
+.txhist-table tbody tr:hover {
+  background: rgba(59, 130, 246, 0.04);
+}
+
+.txhist-table tbody td {
+  padding: 8px 10px;
+  color: #cbd5e1;
+  white-space: nowrap;
+}
+
+.txhist-date {
+  color: #64748b;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Type badges */
+.txhist-type {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.txhist-type-lend {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+}
+
+.txhist-type-borrow {
+  background: rgba(59, 130, 246, 0.12);
+  color: #3b82f6;
+}
+
+.txhist-type-sell_assets {
+  background: rgba(245, 158, 11, 0.12);
+  color: #f59e0b;
+}
+
+.txhist-cp {
+  font-weight: 500;
+}
+
+.txhist-amount {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Outcome badges */
+.txhist-outcome {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.txhist-outcome.pass {
+  color: #10b981;
+}
+
+.txhist-outcome.fail {
+  color: #ef4444;
+}
+
+/* Approved */
+.txhist-approved {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.txhist-approved.yes {
+  color: #10b981;
+}
+
+.txhist-approved.no {
+  color: #64748b;
+}

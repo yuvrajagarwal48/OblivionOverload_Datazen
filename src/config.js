@@ -7,6 +7,10 @@ const isDev = process.env.NODE_ENV === 'development';
 // Set to false when your Python backend is running on localhost:8000
 export const USE_MOCK = true;
 
+// ═══ SUPABASE ═══
+export const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL || '';
+export const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY || '';
+
 // API URLs — in dev, CRA proxy forwards to localhost:8000
 export const API_BASE_URL = isDev ? '' : (process.env.REACT_APP_API_URL || '');
 export const WS_URL = isDev
