@@ -4,10 +4,22 @@ from .risk_metrics import (
     SystemicRiskMetrics,
     ContagionAnalyzer
 )
+from .credit_risk import (
+    CreditRiskLayer,
+    CreditRiskOutput,
+    RiskFeatures,
+    RiskRating,
+    RuleBasedRiskModel
+)
 
 __all__ = [
     'RiskAnalyzer',
     'DebtRankCalculator',
     'SystemicRiskMetrics',
-    'ContagionAnalyzer'
+    'ContagionAnalyzer',
+    'CreditRiskLayer',
+    'CreditRiskOutput',
+    'RiskFeatures',
+    'RiskRating',
+    'RuleBasedRiskModel'
 ]

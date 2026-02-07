@@ -1099,7 +1099,8 @@ class InfrastructureVisualizer:
             members = list(ccp.margin_accounts.keys())
             initial_margins = [ccp.margin_accounts[m].initial_margin for m in members]
             variation_margins = [ccp.margin_accounts[m].variation_margin for m in members]
-            collateral = [ccp.margin_accounts[m].collateral_posted for m in members]
+            # Use total_margin as collateral proxy since collateral_posted doesn't exist
+            collateral = [ccp.margin_accounts[m].total_margin for m in members]
             default_fund = [ccp.margin_accounts[m].default_fund_contribution for m in members]
         else:
             # Demo data

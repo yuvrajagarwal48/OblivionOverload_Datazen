@@ -4,8 +4,8 @@ from .clearing import ClearingMechanism
 from .market import Market
 from .financial_env import FinancialEnvironment, EnvConfig
 from .exchange import Exchange, ExchangeNetwork, ExchangeConfig, ExchangeState
-from .ccp import CentralCounterparty, CCPNetwork, MarginAccount, WaterfallResult
-from .infrastructure import InfrastructureRouter, Transaction, RoutingDecision
+from .ccp import CentralCounterparty, CCPNetwork, CCPConfig, MarginAccount, WaterfallResult
+from .infrastructure import InfrastructureRouter, Transaction, RoutingDecision, TransactionType
 
 __all__ = [
     'FinancialNetwork',
@@ -22,10 +22,12 @@ __all__ = [
     # CCP layer
     'CentralCounterparty',
     'CCPNetwork',
+    'CCPConfig',
     'MarginAccount',
     'WaterfallResult',
     # Infrastructure
     'InfrastructureRouter',
     'Transaction',
-    'RoutingDecision'
+    'RoutingDecision',
+    'TransactionType'
 ]

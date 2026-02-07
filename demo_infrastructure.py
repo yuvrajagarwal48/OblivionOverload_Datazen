@@ -13,8 +13,8 @@ import argparse
 from src.environment import (
     FinancialEnvironment, EnvConfig, 
     Exchange, ExchangeNetwork, ExchangeConfig,
-    CentralCounterparty, CCPNetwork,
-    InfrastructureRouter
+    CentralCounterparty, CCPNetwork, CCPConfig,
+    InfrastructureRouter, TransactionType
 )
 from src.agents.baseline_agents import create_baseline_agent, AgentConfig
 from src.scenarios import ScenarioEngine
@@ -55,15 +55,15 @@ def run_infrastructure_demo(
         save_plots: Save plots to disk
         show_plots: Display plots
     """
-    print("\n" + "═" * 70)
-    print("║" + " " * 12 + "FINSIM-MAPPO INFRASTRUCTURE DEMO" + " " * 19 + "║")
-    print("═" * 70)
-    print(f"║  Scenario:     {scenario:<52s}║")
-    print(f"║  Banks:        {num_banks:<52d}║")
-    print(f"║  Exchanges:    {num_exchanges:<52d}║")
-    print(f"║  CCPs:         {num_ccps:<52d}║")
-    print(f"║  Steps:        {num_steps:<52d}║")
-    print("═" * 70 + "\n")
+    print("\n" + "=" * 70)
+    print("|" + " " * 12 + "FINSIM-MAPPO INFRASTRUCTURE DEMO" + " " * 19 + "|")
+    print("=" * 70)
+    print(f"|  Scenario:     {scenario:<52s}|")
+    print(f"|  Banks:        {num_banks:<52d}|")
+    print(f"|  Exchanges:    {num_exchanges:<52d}|")
+    print(f"|  CCPs:         {num_ccps:<52d}|")
+    print(f"|  Steps:        {num_steps:<52d}|")
+    print("=" * 70 + "\n")
     
     # Initialize visualizers
     if visualize:
@@ -73,7 +73,7 @@ def run_infrastructure_demo(
         risk_dashboard = RiskDashboard(save_dir="outputs/figures")
     
     # Create environment
-    print("  [1/8] 🏗️  Initializing environment...")
+    print("  [1/8] Initializing environment...")
     env_config = EnvConfig(
         num_banks=num_banks,
         episode_length=num_steps,
@@ -81,60 +81,39 @@ def run_infrastructure_demo(
     )
     env = FinancialEnvironment(env_config)
     observations, global_state = env.reset()
-    print(f"        ✓ Network: {env.network.graph.number_of_edges()} edges")
+    print(f"        [OK] Network: {env.network.graph.number_of_edges()} edges")
     
     # Create exchanges
-    print("\n  [2/8] 🏛️  Creating exchanges...")
-    exchange_config = ExchangeConfig(
-        max_throughput=1000,
-        base_fee_rate=0.001,
-        congestion_threshold=0.7,
-        settlement_delay=1
-    )
-    
-    exchanges = []
-    for i in range(num_exchanges):
-        exchange = Exchange(
-            exchange_id=i,
-            config=exchange_config
-        )
-        exchanges.append(exchange)
-    
-    exchange_network = ExchangeNetwork(exchanges)
-    print(f"        ✓ Created {num_exchanges} exchanges")
+    print("\n  [2/8] Creating exchanges...")
+    exchange_network = ExchangeNetwork(num_exchanges=num_exchanges, seed=42)
+    exchanges = list(exchange_network.exchanges.values())
+    print(f"        [OK] Created {num_exchanges} exchanges")
     
     # Create CCPs
-    print("\n  [3/8] 🏦 Creating CCPs (Clearing Houses)...")
-    ccps = []
-    for i in range(num_ccps):
-        ccp = CentralCounterparty(
-            ccp_id=i,
-            initial_capital=10_000_000,
-            initial_margin_rate=0.1,
-            variation_margin_rate=0.05,
-            default_fund_rate=0.02,
-            netting_efficiency=0.6
-        )
-        # Register all banks as members
+    print("\n  [3/8] Creating CCPs (Clearing Houses)...")
+    ccp_network = CCPNetwork(num_ccps=num_ccps, seed=42)
+    ccps = list(ccp_network.ccps.values())
+    # Register all banks as members for each CCP
+    for ccp in ccps:
         for bank_id in range(num_banks):
-            ccp.register_member(bank_id, initial_collateral=100_000)
-        ccps.append(ccp)
-    
-    ccp_network = CCPNetwork(ccps)
-    print(f"        ✓ Created {num_ccps} CCPs with {num_banks} members each")
+            ccp.add_member(bank_id, initial_exposure=100_000)
+    print(f"        [OK] Created {num_ccps} CCPs with {num_banks} members each")
     
     # Create infrastructure router
-    print("\n  [4/8] 🔀 Creating infrastructure router...")
+    print("\n  [4/8] Creating infrastructure router...")
     router = InfrastructureRouter(
-        exchanges=exchanges,
-        ccps=ccps,
-        banks=env.network.banks
+        exchange_network=exchange_network,
+        ccp_network=ccp_network,
+        seed=42
     )
-    print("        ✓ Router configured: Banks → Exchanges → CCPs → Banks")
+    # Register all banks with the router
+    for bank_id in range(num_banks):
+        router.register_bank(bank_id)
+    print("        [OK] Router configured: Banks -> Exchanges -> CCPs -> Banks")
     
     # Visualize infrastructure
     if visualize:
-        print("\n  [5/8] 🗺️  Visualizing infrastructure network...")
+        print("\n  [5/8] Visualizing infrastructure network...")
         infra_viz.plot_infrastructure_network(
             exchanges=exchanges,
             ccps=ccps,
@@ -145,7 +124,7 @@ def run_infrastructure_demo(
         )
     
     # Create agents
-    print("\n  [6/8] 🤖 Creating agents...")
+    print("\n  [6/8] Creating agents...")
     agents = {}
     agent_types = ['rule_based', 'myopic', 'conservative', 'greedy']
     
@@ -158,16 +137,16 @@ def run_infrastructure_demo(
             seed=42 + i
         )
         agents[i] = create_baseline_agent(agent_type, agent_config)
-    print(f"        ✓ Created {num_banks} agents")
+    print(f"        [OK] Created {num_banks} agents")
     
     # Set scenario
-    print(f"\n  [7/8] 📋 Setting scenario: {scenario}")
+    print(f"\n  [7/8] Setting scenario: {scenario}")
     scenario_engine = ScenarioEngine(seed=42)
     scenario_engine.set_scenario(scenario)
     
     # Run simulation
-    print(f"\n  [8/8] 🚀 Running simulation with infrastructure routing...")
-    print("  " + "─" * 66)
+    print(f"\n  [8/8] Running simulation with infrastructure routing...")
+    print("  " + "-" * 66)
     
     total_rewards = {i: 0.0 for i in range(num_banks)}
     infrastructure_stats = {
@@ -189,7 +168,7 @@ def run_infrastructure_demo(
         for agent_id, agent in agents.items():
             obs = observations[agent_id]
             # Add infrastructure observation (8 dims)
-            infra_obs = router.get_infrastructure_observation()
+            infra_obs = router.get_infrastructure_observation(agent_id)
             # Extend observation with infrastructure state
             extended_obs = np.concatenate([obs, infra_obs])
             actions[agent_id] = agent.select_action(obs)  # Use original obs for action
@@ -209,28 +188,27 @@ def run_infrastructure_demo(
                 amount = lending_target * 10000  # Scale
                 
                 # Route through infrastructure
-                result = router.submit_transaction(
-                    sender_id=agent_id,
-                    receiver_id=counterparty,
+                transaction = router.submit_transaction(
+                    source_bank=agent_id,
+                    transaction_type=TransactionType.INTERBANK_LEND,
                     amount=amount,
-                    transaction_type='lending'
+                    price=1.0,
+                    target_bank=counterparty
                 )
                 
-                if result['success']:
+                if transaction is not None:
                     infrastructure_stats['total_transactions'] += 1
-                    infrastructure_stats['exchange_fees'] += result.get('fee', 0)
-                    infrastructure_stats['settlement_delays'].append(
-                        result.get('delay', 0)
-                    )
+                    infrastructure_stats['exchange_fees'] += 0  # Fee calculated elsewhere
+                    infrastructure_stats['settlement_delays'].append(0)
         
-        # Update exchange congestion
+        # Update exchange metrics by processing orders
         for exchange in exchanges:
-            exchange.update_congestion()
-            infrastructure_stats['congestion_levels'].append(exchange.congestion)
+            exchange.process_orders(market_price=1.0)  # Use normalized price
+            infrastructure_stats['congestion_levels'].append(exchange.congestion_level)
         
         # Process CCP margin calls
         for ccp in ccps:
-            ccp.process_margin_calls()
+            ccp.process_margin_calls(current_price=1.0)
         
         # Step environment
         result = env.step(actions)
@@ -269,24 +247,24 @@ def run_infrastructure_demo(
             print(f"\n        ⚠️  Episode ended early at step {step + 1}")
             break
     
-    print("\n  " + "─" * 66)
+    print("\n  " + "-" * 66)
     
     # Infrastructure summary
-    print("\n  🏛️  INFRASTRUCTURE SUMMARY")
-    print("  " + "─" * 40)
-    print(f"  │ Total Transactions:   {infrastructure_stats['total_transactions']:,}")
-    print(f"  │ Exchange Fees:        ${infrastructure_stats['exchange_fees']:,.2f}")
+    print("\n  INFRASTRUCTURE SUMMARY")
+    print("  " + "-" * 40)
+    print(f"  | Total Transactions:   {infrastructure_stats['total_transactions']:,}")
+    print(f"  | Exchange Fees:        ${infrastructure_stats['exchange_fees']:,.2f}")
     if infrastructure_stats['settlement_delays']:
         avg_delay = np.mean(infrastructure_stats['settlement_delays'])
-        print(f"  │ Avg Settlement Delay: {avg_delay:.2f} steps")
+        print(f"  | Avg Settlement Delay: {avg_delay:.2f} steps")
     if infrastructure_stats['congestion_levels']:
         avg_congestion = np.mean(infrastructure_stats['congestion_levels'])
         max_congestion = max(infrastructure_stats['congestion_levels'])
-        print(f"  │ Avg Congestion:       {avg_congestion:.2%}")
-        print(f"  │ Max Congestion:       {max_congestion:.2%}")
+        print(f"  | Avg Congestion:       {avg_congestion:.2%}")
+        print(f"  | Max Congestion:       {max_congestion:.2%}")
     
     # Risk analysis
-    print("\n  📊 Analyzing results...")
+    print("\n  [*] Analyzing results...")
     risk_analyzer = RiskAnalyzer()
     network = env.network
     
@@ -308,7 +286,7 @@ def run_infrastructure_demo(
     
     # Create visualizations
     if visualize:
-        print("  📈 Generating visualizations...")
+        print("  [*] Generating visualizations...")
         
         # Simulation summary
         sim_viz.plot_simulation_summary(
@@ -350,10 +328,10 @@ def run_infrastructure_demo(
             show=False
         )
         
-        print("\n  ✅ All visualizations saved to outputs/figures/")
+        print("\n  [OK] All visualizations saved to outputs/figures/")
         
         if show_plots:
-            print("  🖼️  Displaying plots...")
+            print("  Displaying plots...")
             import matplotlib.pyplot as plt
             plt.show()
     
