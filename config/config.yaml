@@ -7,11 +7,11 @@ network:
   core_fraction: 0.2
   seed: 42
 
-# Bank Initialization
+# Bank Initialization (values in crores)
 bank:
-  initial_cash_range: [100, 500]
-  initial_assets_range: [200, 1000]
-  initial_external_liabilities_range: [50, 300]
+  initial_cash_range: [5000, 15000]        # 50-150 crores cash
+  initial_assets_range: [10000, 30000]     # 100-300 crores assets
+  initial_external_liabilities_range: [3000, 10000]  # 30-100 crores liabilities
   min_capital_ratio: 0.08
   target_capital_ratio: 0.12
 
