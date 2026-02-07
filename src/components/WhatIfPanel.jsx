@@ -2,7 +2,8 @@ import React, { useState, useCallback } from 'react';
 import { FlaskConical, Check, X, Loader2, TrendingUp, TrendingDown } from 'lucide-react';
 import useSimulationStore from '../store/simulationStore';
 import { insertTransaction } from '../lib/supabase';
-import { API_BASE_URL, USE_MOCK } from '../config';
+import { USE_MOCK } from '../config';
+import * as api from '../services/api';
 import './WhatIfPanel.css';
 
 const TX_TYPES = [
@@ -12,12 +13,13 @@ const TX_TYPES = [
 ];
 
 /**
- * WhatIfPanel — Transaction proposal + mini-simulation.
- * Flow:
- *   1. Select type + counterparty + amount
- *   2. "Run Simulation" → calls backend /what_if or mock evaluator
- *   3. Shows Pass/Fail + risk delta
- *   4. Approve → stores in Supabase; Reject → clears
+ * WhatIfPanel — Transaction proposal + simulation.
+ *
+ * API mode: POST /what_if  (legacy endpoint in main.py)
+ *   Body: { bank_id, action: [lend_pct, borrow_pct, sell_pct, hold_pct] }
+ *   Returns: counterfactual analysis with risk deltas
+ *
+ * Mock mode: local mock evaluator
  */
 export default function WhatIfPanel({ neighborNodes = [] }) {
   const currentBankId = useSimulationStore((s) => s.currentBankId);
@@ -27,7 +29,7 @@ export default function WhatIfPanel({ neighborNodes = [] }) {
   const [counterparty, setCounterparty] = useState('');
   const [amount, setAmount] = useState('');
   const [simulating, setSimulating] = useState(false);
-  const [result, setResult] = useState(null); // { pass, riskBefore, riskAfter, message }
+  const [result, setResult] = useState(null);
   const [saving, setSaving] = useState(false);
 
   const resetForm = useCallback(() => {
@@ -57,12 +59,11 @@ export default function WhatIfPanel({ neighborNodes = [] }) {
         } else if (txType === 'BORROW') {
           riskAfter = riskBefore + amountVal * 0.001;
         } else {
-          // SELL_ASSETS
           riskAfter = riskBefore + amountVal * 0.003;
         }
 
         riskAfter = Math.max(0, Math.min(1, riskAfter));
-        const pass = riskAfter >= 0.04; // regulatory minimum
+        const pass = riskAfter >= 0.04;
 
         setResult({
           pass,
@@ -73,18 +74,35 @@ export default function WhatIfPanel({ neighborNodes = [] }) {
             : 'Capital ratio falls below 4% — regulatory violation.',
         });
       } else {
-        const res = await fetch(`${API_BASE_URL}/what_if`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            bank_id: currentBankId,
-            tx_type: txType,
-            counterparty: Number(counterparty),
-            amount: Number(amount),
-          }),
+        // ─── Real API call ───
+        // Map tx type to action vector: [lend_pct, borrow_pct, sell_pct, hold_pct]
+        const actionMap = {
+          LEND:        [1.0, 0.0, 0.0, 0.0],
+          BORROW:      [0.0, 1.0, 0.0, 0.0],
+          SELL_ASSETS:  [0.0, 0.0, 1.0, 0.0],
+        };
+        const action = actionMap[txType] || [0, 0, 0, 1];
+
+        const data = await api.legacyWhatIf({
+          bank_id: Number(currentBankId),
+          action,
         });
-        const data = await res.json();
-        setResult(data);
+
+        // Parse backend response
+        // data could be: { current_state, proposed_action, projected_outcomes, risk_assessment, ... }
+        const riskBefore = data.current_state?.capital_ratio ?? data.risk_before ?? 0.08;
+        const riskAfter = data.projected_outcomes?.capital_ratio ?? data.risk_after ?? riskBefore;
+        const pass = (data.risk_assessment?.passes_threshold !== false) && riskAfter >= 0.04;
+
+        setResult({
+          pass,
+          riskBefore,
+          riskAfter,
+          message: data.risk_assessment?.explanation ||
+                   data.recommendation?.reason ||
+                   (pass ? 'Transaction passes risk thresholds.' : 'Transaction fails risk assessment.'),
+          details: data, // store full response for debugging
+        });
       }
     } catch (err) {
       setResult({ pass: false, message: `Simulation error: ${err.message}` });

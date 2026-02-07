@@ -39,6 +39,8 @@ function App() {
   const timestep = useSimulationStore((s) => s?.timestep || 0);
   const currentBankData = useSimulationStore((s) => s?.currentBankData);
   const logout = useSimulationStore((s) => s?.logout);
+  const apiLoading = useSimulationStore((s) => s?.apiLoading ?? false);
+  const apiError = useSimulationStore((s) => s?.apiError);
 
   const [activeSidebar, setActiveSidebar] = useState('config');
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -85,6 +87,18 @@ function App() {
           {currentBankData && (
             <div className="titlebar-bank-name">
               <span className="bank-name-label">{currentBankData.name}</span>
+            </div>
+          )}
+          {apiLoading && (
+            <div className="titlebar-api-loading">
+              <span className="api-spinner" />
+              <span>API</span>
+            </div>
+          )}
+          {apiError && (
+            <div className="titlebar-api-error" title={apiError}>
+              <span className="api-error-dot" />
+              <span>API Error</span>
             </div>
           )}
           <div className={`titlebar-status status-${simStatus}`}>

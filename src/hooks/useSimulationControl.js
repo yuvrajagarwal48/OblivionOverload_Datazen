@@ -1,13 +1,14 @@
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import useSimulationStore from '../store/simulationStore';
-import { API_BASE_URL, USE_MOCK } from '../config';
+import { USE_MOCK, POLL_INTERVAL } from '../config';
 import { getMockSimulation } from '../mock/mockSimulation';
+import * as api from '../services/api';
 
 /**
- * REST control hooks for simulation lifecycle.
- * POST /control/{play,pause,step,reset}
+ * Simulation lifecycle controller.
  *
- * When USE_MOCK is true, uses the mock simulation engine instead of REST.
+ * USE_MOCK=true  → mock engine (no backend)
+ * USE_MOCK=false → real FastAPI backend with polling loop
  */
 export default function useSimulationControl() {
   const setSimStatus = useSimulationStore((s) => s.setSimStatus);
@@ -22,21 +23,98 @@ export default function useSimulationControl() {
   const customConfig = useSimulationStore((s) => s.customConfig);
   const setNodeDecision = useSimulationStore((s) => s.setNodeDecision);
 
-  const postControl = useCallback(async (action, body = null) => {
+  // API-mode state
+  const setApiLoading = useSimulationStore((s) => s.setApiLoading);
+  const setApiError = useSimulationStore((s) => s.setApiError);
+  const setBackendInitialized = useSimulationStore((s) => s.setBackendInitialized);
+  const ingestBackendState = useSimulationStore((s) => s.ingestBackendState);
+  const ingestEdges = useSimulationStore((s) => s.ingestEdges);
+  const ingestSystemicRisk = useSimulationStore((s) => s.ingestSystemicRisk);
+  const ingestTimeSeries = useSimulationStore((s) => s.ingestTimeSeries);
+  const ingestStepResult = useSimulationStore((s) => s.ingestStepResult);
+  const ingestMarketState = useSimulationStore((s) => s.ingestMarketState);
+
+  // Polling ref
+  const pollRef = useRef(null);
+
+  // ─── Fetch full state from backend ───
+  const fetchFullState = useCallback(async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/control/${action}`, {
-        method: 'POST',
-        headers: body ? { 'Content-Type': 'application/json' } : {},
-        body: body ? JSON.stringify(body) : null,
-      });
-      if (!res.ok) {
-        console.error(`[Control] ${action} failed:`, res.status, await res.text());
-        return false;
+      // Fetch state, topology, analytics, time series in parallel
+      const [stateRes, topoRes, riskRes, tsRes] = await Promise.allSettled([
+        api.getSimulationState(),
+        api.getNetworkTopology(),
+        api.getSystemicRisk(),
+        api.getTimeSeriesData('market_price,default_rate,avg_capital_ratio,liquidity_index'),
+      ]);
+
+      if (stateRes.status === 'fulfilled') {
+        ingestBackendState(stateRes.value);
+        if (stateRes.value.market) ingestMarketState(stateRes.value);
       }
-      return true;
+      if (topoRes.status === 'fulfilled' && topoRes.value.edges) {
+        ingestEdges(topoRes.value.edges);
+      }
+      if (riskRes.status === 'fulfilled') {
+        ingestSystemicRisk(riskRes.value);
+      }
+      if (tsRes.status === 'fulfilled') {
+        ingestTimeSeries(tsRes.value);
+      }
+
+      // Fetch events separately
+      try {
+        const eventsRes = await api.getSimulationEvents();
+        if (eventsRes.events) {
+          eventsRes.events.forEach((evt) => pushEvent(evt));
+        }
+      } catch { /* events optional */ }
+
     } catch (err) {
-      console.error(`[Control] ${action} error:`, err);
-      return false;
+      console.error('[API] fetchFullState error:', err);
+    }
+  }, [ingestBackendState, ingestEdges, ingestSystemicRisk, ingestTimeSeries, ingestMarketState, pushEvent]);
+
+  // ─── Poll loop: step + fetch state ───
+  const startPolling = useCallback(() => {
+    if (pollRef.current) return;
+
+    const poll = async () => {
+      try {
+        // Step the simulation
+        const stepResult = await api.stepSimulation(1);
+        ingestStepResult(stepResult);
+
+        // Check if done
+        if (stepResult.is_done) {
+          stopPolling();
+          setSimStatus('done');
+          // Final full fetch
+          await fetchFullState();
+          return;
+        }
+
+        // Fetch full state after step
+        await fetchFullState();
+
+      } catch (err) {
+        console.error('[API] Polling error:', err);
+        setApiError(err.message);
+        stopPolling();
+        setSimStatus('paused');
+      }
+    };
+
+    pollRef.current = setInterval(poll, POLL_INTERVAL);
+    // Run immediately
+    poll();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchFullState, ingestStepResult, setSimStatus, setApiError]);
+
+  const stopPolling = useCallback(() => {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
     }
   }, []);
 
@@ -52,7 +130,6 @@ export default function useSimulationControl() {
     mock.onStateUpdate = (payload) => setStateUpdate(payload);
     mock.onEvent = (event) => {
       pushEvent(event);
-      // Track the decision on relevant nodes
       if (event.from) setNodeDecision(event.from, event.event_type);
       if (event.bank) setNodeDecision(event.bank, event.event_type);
     };
@@ -69,26 +146,48 @@ export default function useSimulationControl() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedScenario, customConfig, setSimStatus, setStateUpdate, pushEvent, setMetrics]);
 
-  // ─── Play ───
-  const play = useCallback(async () => {
-    if (USE_MOCK) return playMock();
-
+  // ─── API-mode play ───
+  const playAPI = useCallback(async () => {
     const scenario = selectedScenario;
     if (!scenario) {
-      console.warn('[Control] No scenario selected');
+      console.warn('[API] No scenario selected');
       return false;
     }
 
-    const body = {
-      scenario,
-      ...(scenario === 'custom' ? { config: customConfig } : {}),
-    };
+    setApiLoading(true);
+    try {
+      // Use 'normal' scenario for all frontend selections for now
+      await api.initSimulation({
+        num_banks: 30,
+        episode_length: 100,
+        scenario: 'normal',
+      });
+      setBackendInitialized(true);
 
-    const ok = await postControl('play', body);
-    if (ok) setSimStatus('running');
-    return ok;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedScenario, customConfig, postControl, setSimStatus, playMock]);
+      // Fetch initial state
+      await fetchFullState();
+
+      setSimStatus('running');
+      setApiLoading(false);
+
+      // Start polling loop
+      startPolling();
+
+      console.log('[API] Simulation started:', scenario);
+      return true;
+    } catch (err) {
+      console.error('[API] Init failed:', err);
+      setApiError(err.message);
+      setApiLoading(false);
+      return false;
+    }
+  }, [selectedScenario, customConfig, setSimStatus, setApiLoading, setApiError, setBackendInitialized, fetchFullState, startPolling]);
+
+  // ─── Play ───
+  const play = useCallback(async () => {
+    if (USE_MOCK) return playMock();
+    return playAPI();
+  }, [playMock, playAPI]);
 
   // ─── Pause ───
   const pause = useCallback(async () => {
@@ -97,10 +196,10 @@ export default function useSimulationControl() {
       setSimStatus('paused');
       return true;
     }
-    const ok = await postControl('pause');
-    if (ok) setSimStatus('paused');
-    return ok;
-  }, [postControl, setSimStatus]);
+    stopPolling();
+    setSimStatus('paused');
+    return true;
+  }, [setSimStatus, stopPolling]);
 
   // ─── Step ───
   const step = useCallback(async () => {
@@ -108,21 +207,36 @@ export default function useSimulationControl() {
       getMockSimulation().stepOnce();
       return true;
     }
-    const ok = await postControl('step');
-    return ok;
-  }, [postControl]);
+    try {
+      const result = await api.stepSimulation(1);
+      ingestStepResult(result);
+      await fetchFullState();
+      return true;
+    } catch (err) {
+      console.error('[API] Step error:', err);
+      setApiError(err.message);
+      return false;
+    }
+  }, [ingestStepResult, fetchFullState, setApiError]);
 
   // ─── Reset ───
   const reset = useCallback(async () => {
+    stopPolling();
     if (USE_MOCK) {
       getMockSimulation().reset();
       resetAll();
       return true;
     }
-    const ok = await postControl('reset');
-    if (ok) resetAll();
-    return ok;
-  }, [postControl, resetAll]);
+    try {
+      await api.resetSimulation();
+      resetAll();
+      return true;
+    } catch (err) {
+      console.error('[API] Reset error:', err);
+      resetAll();
+      return true;
+    }
+  }, [resetAll, stopPolling]);
 
   return { play, pause, step, reset };
 }

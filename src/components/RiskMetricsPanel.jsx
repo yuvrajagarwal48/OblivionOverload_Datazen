@@ -1,16 +1,46 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { AlertTriangle, TrendingUp, Network, Target } from 'lucide-react';
 import useSimulationStore from '../store/simulationStore';
+import { USE_MOCK } from '../config';
+import * as api from '../services/api';
 import './RiskMetricsPanel.css';
 
 /**
  * RiskMetricsPanel — Advanced systemic risk metrics
- * Shows DebtRank, cascade analysis, critical banks, network concentration
+ * Shows DebtRank, cascade analysis, critical banks, network concentration.
+ *
+ * In API mode: fetches from /api/analytics/systemic-risk + /api/analytics/debtrank
+ * In Mock mode: reads from store (populated by mock engine)
  */
 export default function RiskMetricsPanel() {
   const advancedMetrics = useSimulationStore((s) => s.advancedMetrics);
   const bankDebtRanks = useSimulationStore((s) => s.bankDebtRanks);
   const nodes = useSimulationStore((s) => s.nodes);
+  const simStatus = useSimulationStore((s) => s.simStatus);
+  const ingestSystemicRisk = useSimulationStore((s) => s.ingestSystemicRisk);
+  const ingestDebtRank = useSimulationStore((s) => s.ingestDebtRank);
+  const intervalRef = useRef(null);
+
+  // Poll risk data from API when running in API mode
+  useEffect(() => {
+    if (USE_MOCK) return;
+    if (simStatus !== 'running' && simStatus !== 'paused' && simStatus !== 'done') return;
+
+    const fetchRisk = async () => {
+      try {
+        const [riskRes, drRes] = await Promise.allSettled([
+          api.getSystemicRisk(),
+          api.getDebtRank(),
+        ]);
+        if (riskRes.status === 'fulfilled') ingestSystemicRisk(riskRes.value);
+        if (drRes.status === 'fulfilled') ingestDebtRank(drRes.value);
+      } catch { /* silent */ }
+    };
+
+    fetchRisk();
+    intervalRef.current = setInterval(fetchRisk, 3000);
+    return () => clearInterval(intervalRef.current);
+  }, [simStatus, ingestSystemicRisk, ingestDebtRank]);
 
   // Get top 5 banks by DebtRank
   const topDebtRanks = Object.entries(bankDebtRanks)

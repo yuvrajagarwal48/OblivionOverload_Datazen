@@ -5,17 +5,18 @@ const isDev = process.env.NODE_ENV === 'development';
 // ═══ MOCK MODE ═══
 // Set to true to run with dummy data (no backend needed)
 // Set to false when your Python backend is running on localhost:8000
-export const USE_MOCK = true;
+export const USE_MOCK = process.env.REACT_APP_USE_MOCK === 'true' || false;
 
 // ═══ SUPABASE ═══
 export const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL || '';
 export const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY || '';
 
 // API URLs — in dev, CRA proxy forwards to localhost:8000
+// Backend routes use /api prefix (set in main.py)
 export const API_BASE_URL = isDev ? '' : (process.env.REACT_APP_API_URL || '');
-export const WS_URL = isDev
-  ? `ws://localhost:8000/ws/simulation`
-  : (process.env.REACT_APP_WS_URL || `ws://${window.location.host}/ws/simulation`);
+
+// Polling interval for live API mode (ms)
+export const POLL_INTERVAL = 800;
 
 // Animation durations (ms)
 export const ANIMATION = {

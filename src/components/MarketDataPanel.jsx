@@ -1,17 +1,46 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect, useRef } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { TrendingUp, DollarSign, BarChart3, Activity } from 'lucide-react';
 import useSimulationStore from '../store/simulationStore';
+import { USE_MOCK } from '../config';
+import * as api from '../services/api';
 import './MarketDataPanel.css';
 
 /**
- * MarketDataPanel — Market conditions and time-series charts
- * Shows asset prices, interest rates, liquidity over time
+ * MarketDataPanel — Market conditions and time-series charts.
+ *
+ * In API mode: fetches from /api/simulation/history/timeseries + /api/market/state
+ * In Mock mode: reads from store (populated by mock engine)
  */
 export default function MarketDataPanel() {
   const advancedMetrics = useSimulationStore((s) => s.advancedMetrics);
   const timeSeriesHistory = useSimulationStore((s) => s.timeSeriesHistory);
   const timestep = useSimulationStore((s) => s.timestep);
+  const simStatus = useSimulationStore((s) => s.simStatus);
+  const ingestTimeSeries = useSimulationStore((s) => s.ingestTimeSeries);
+  const ingestMarketState = useSimulationStore((s) => s.ingestMarketState);
+  const intervalRef = useRef(null);
+
+  // Poll market / time-series data from API
+  useEffect(() => {
+    if (USE_MOCK) return;
+    if (simStatus !== 'running' && simStatus !== 'paused' && simStatus !== 'done') return;
+
+    const fetchMarket = async () => {
+      try {
+        const [tsRes, mktRes] = await Promise.allSettled([
+          api.getTimeSeriesData('market_price,default_rate,avg_capital_ratio,liquidity_index'),
+          api.getMarketState(),
+        ]);
+        if (tsRes.status === 'fulfilled') ingestTimeSeries(tsRes.value);
+        if (mktRes.status === 'fulfilled') ingestMarketState(mktRes.value);
+      } catch { /* silent */ }
+    };
+
+    fetchMarket();
+    intervalRef.current = setInterval(fetchMarket, 3000);
+    return () => clearInterval(intervalRef.current);
+  }, [simStatus, ingestTimeSeries, ingestMarketState]);
 
   // Prepare chart data
   const chartData = useMemo(() => {
