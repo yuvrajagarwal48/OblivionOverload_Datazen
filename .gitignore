@@ -1,2 +1,5 @@
 venv
 build
+node_modules
+.venv
+.env
