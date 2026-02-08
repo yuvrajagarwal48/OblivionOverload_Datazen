@@ -15,6 +15,11 @@ from .models import (
     TimeSeriesData, MultiSeriesData
 )
 
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from data.bank_registry import bank_registry
+
 router = APIRouter(prefix="/simulation", tags=["Simulation"])
 
 
@@ -28,33 +33,82 @@ async def init_simulation(config: SimulationConfig) -> Dict[str, Any]:
     Initialize a new simulation with the given configuration.
     
     This sets up:
-    - Financial environment with specified banks
+    - Financial environment with specified banks (real or random)
     - Exchanges and CCPs (infrastructure layer)
     - Baseline agents for each bank
     - Analytics engines
     - State capture system
     """
     try:
+        real_bank_configs = None
+        bank_info = []
+        
+        # Resolve real banks if requested
+        if config.bank_ids or config.bank_names:
+            real_banks = []
+            
+            if config.bank_ids:
+                real_banks = bank_registry.get_banks_by_ids(config.bank_ids)
+                if len(real_banks) != len(config.bank_ids):
+                    found_ids = {b.bank_id for b in real_banks}
+                    missing = [bid for bid in config.bank_ids if bid not in found_ids]
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Bank IDs not found in registry: {missing}"
+                    )
+            elif config.bank_names:
+                real_banks = bank_registry.get_banks_by_names(config.bank_names)
+                if len(real_banks) != len(config.bank_names):
+                    found_names = {b.name for b in real_banks}
+                    missing = [n for n in config.bank_names if n not in found_names]
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Bank names not found in registry: {missing}"
+                    )
+            
+            # Add synthetic banks if requested
+            if config.synthetic_count and config.synthetic_count > 0:
+                synthetic = bank_registry.generate_synthetic_banks(
+                    count=config.synthetic_count,
+                    start_id=100,
+                    stress_level=config.synthetic_stress or "normal",
+                    seed=config.seed
+                )
+                real_banks.extend(synthetic)
+            
+            # Convert to config dicts
+            real_bank_configs = [b.to_dict() for b in real_banks]
+            bank_info = [{"id": i, "name": b.name, "tier": b.tier} 
+                        for i, b in enumerate(real_banks)]
+        
         simulation_state.initialize(
             num_banks=config.num_banks,
             episode_length=config.episode_length,
             scenario=config.scenario,
             num_exchanges=config.num_exchanges,
             num_ccps=config.num_ccps,
-            seed=config.seed
+            seed=config.seed,
+            real_bank_configs=real_bank_configs
         )
+        
+        actual_num_banks = len(real_bank_configs) if real_bank_configs else config.num_banks
         
         return {
             "status": "initialized",
             "config": {
-                "num_banks": config.num_banks,
+                "num_banks": actual_num_banks,
                 "episode_length": config.episode_length,
                 "scenario": config.scenario,
                 "num_exchanges": config.num_exchanges,
-                "num_ccps": config.num_ccps
+                "num_ccps": config.num_ccps,
+                "use_real_banks": real_bank_configs is not None
             },
-            "message": "Simulation initialized successfully"
+            "banks": bank_info if bank_info else None,
+            "message": "Simulation initialized successfully" + 
+                      (f" with {len(bank_info)} real banks" if bank_info else " with random banks")
         }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -101,7 +155,23 @@ async def step_simulation(
     if num_steps == 1:
         result = simulation_state.step(actions=action_dict, capture_state=capture)
         
-        return {
+        # Convert numpy types to native Python types for JSON serialization
+        def convert_numpy(obj):
+            if isinstance(obj, dict):
+                return {k: convert_numpy(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [convert_numpy(v) for v in obj]
+            elif isinstance(obj, (np.integer,)):
+                return int(obj)
+            elif isinstance(obj, (np.floating,)):
+                return float(obj)
+            elif isinstance(obj, np.bool_):
+                return bool(obj)
+            elif isinstance(obj, np.ndarray):
+                return obj.tolist()
+            return obj
+        
+        return convert_numpy({
             "steps_completed": 1,
             "current_step": result["step"],
             "is_done": result["done"],
@@ -109,7 +179,7 @@ async def step_simulation(
             "network_stats": result["network_stats"],
             "market_state": result["market_state"],
             "infrastructure": result.get("infrastructure", {})
-        }
+        })
     else:
         result = simulation_state.run_steps(num_steps)
         return result
@@ -186,12 +256,12 @@ async def get_simulation_status() -> Dict[str, Any]:
         
         # Quick summary metrics
         "summary": {
-            "healthy_banks": network_stats.num_healthy,
-            "stressed_banks": network_stats.num_stressed,
-            "defaulted_banks": network_stats.num_defaulted,
-            "market_price": market_state.asset_price,
-            "avg_capital_ratio": network_stats.avg_capital_ratio,
-            "total_exposure": network_stats.total_interbank_exposure
+            "healthy_banks": int(network_stats.num_banks - network_stats.num_stressed - network_stats.num_defaulted),
+            "stressed_banks": int(network_stats.num_stressed),
+            "defaulted_banks": int(network_stats.num_defaulted),
+            "market_price": float(market_state.asset_price),
+            "avg_capital_ratio": float(network_stats.avg_capital_ratio),
+            "total_exposure": float(network_stats.total_exposure)
         }
     }
 
@@ -207,6 +277,22 @@ async def get_current_state() -> Dict[str, Any]:
     market_state = env.market.get_state()
     network_stats = network.get_network_stats()
     
+    # Helper to convert numpy types
+    def convert_numpy(obj):
+        if isinstance(obj, dict):
+            return {k: convert_numpy(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [convert_numpy(v) for v in obj]
+        elif isinstance(obj, (np.integer,)):
+            return int(obj)
+        elif isinstance(obj, (np.floating,)):
+            return float(obj)
+        elif isinstance(obj, np.bool_):
+            return bool(obj)
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return obj
+    
     # Bank summaries
     banks = {}
     for bank_id, bank in network.banks.items():
@@ -214,12 +300,14 @@ async def get_current_state() -> Dict[str, Any]:
             "bank_id": bank_id,
             "tier": bank.tier,
             "status": bank.status.value,
-            "equity": bank.balance_sheet.equity,
-            "capital_ratio": bank.capital_ratio,
-            "cash": bank.balance_sheet.cash,
-            "total_assets": bank.balance_sheet.total_assets,
-            "total_liabilities": bank.balance_sheet.total_liabilities
+            "equity": float(bank.balance_sheet.equity),
+            "capital_ratio": float(bank.capital_ratio),
+            "cash": float(bank.balance_sheet.cash),
+            "total_assets": float(bank.balance_sheet.total_assets),
+            "total_liabilities": float(bank.balance_sheet.total_liabilities)
         }
+        if hasattr(bank, 'name') and bank.name:
+            banks[bank_id]["name"] = bank.name
     
     # Exchange status
     exchanges = []
@@ -227,9 +315,10 @@ async def get_current_state() -> Dict[str, Any]:
         ex_state = ex.get_state()
         exchanges.append({
             "exchange_id": ex.exchange_id,
-            "congestion_level": ex_state.congestion_level,
-            "transaction_volume": ex_state.transaction_volume,
-            "fees_collected": ex_state.total_fees_collected
+            "congestion_level": float(ex_state.congestion_level),
+            "current_volume": float(ex_state.current_volume),
+            "status": ex_state.status.value,
+            "backlog_size": int(ex_state.backlog_size)
         })
     
     # CCP status
@@ -239,15 +328,15 @@ async def get_current_state() -> Dict[str, Any]:
         ccps.append({
             "ccp_id": ccp.ccp_id,
             "status": ccp_state.status.value,
-            "total_margin": ccp_state.total_initial_margin + ccp_state.total_variation_margin,
-            "default_fund": ccp_state.default_fund_size,
-            "stress_level": ccp_state.stress_level
+            "total_margin": float(ccp_state.total_initial_margin + ccp_state.total_variation_margin),
+            "default_fund": float(ccp_state.default_fund_size),
+            "stress_level": float(ccp_state.stress_level)
         })
     
     return {
-        "timestep": env.current_step,
-        "market": market_state.to_dict(),
-        "network_stats": network_stats.to_dict(),
+        "timestep": int(env.current_step),
+        "market": convert_numpy(market_state.to_dict()),
+        "network_stats": convert_numpy(network_stats.to_dict()),
         "banks": banks,
         "exchanges": exchanges,
         "ccps": ccps

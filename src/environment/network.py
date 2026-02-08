@@ -140,6 +140,55 @@ class FinancialNetwork:
         # Build liability matrix
         self._build_liability_matrix()
     
+    def generate_from_real_banks(self, bank_configs: List[Dict]) -> None:
+        """
+        Generate network using real bank configurations from the registry.
+        
+        Args:
+            bank_configs: List of dicts with keys:
+                bank_id, name, tier, initial_cash, initial_assets,
+                initial_external_liabilities, min_capital_ratio, metadata
+        """
+        self.num_banks = len(bank_configs)
+        
+        # Generate BA scale-free network topology
+        undirected = nx.barabasi_albert_graph(
+            n=self.num_banks,
+            m=min(self.edges_per_node, self.num_banks - 1),
+            seed=self.seed
+        )
+        
+        self.graph = nx.DiGraph()
+        self.graph.add_nodes_from(range(self.num_banks))
+        
+        for u, v in undirected.edges():
+            if self._rng.random() < 0.5:
+                self.graph.add_edge(u, v)
+            else:
+                self.graph.add_edge(v, u)
+            if self._rng.random() < 0.3:
+                self.graph.add_edge(v, u)
+        
+        # Create banks from real configs
+        self.banks = {}
+        for i, cfg in enumerate(bank_configs):
+            bank = Bank(
+                bank_id=i,
+                tier=cfg.get('tier', 2),
+                initial_cash=cfg.get('initial_cash', 500),
+                initial_assets=cfg.get('initial_assets', 1000),
+                initial_external_liabilities=cfg.get('initial_external_liabilities', 500),
+                min_capital_ratio=cfg.get('min_capital_ratio', 0.08)
+            )
+            # Attach real bank metadata
+            bank.name = cfg.get('name', f'Bank {i}')
+            bank.metadata = cfg.get('metadata', {})
+            self.banks[i] = bank
+        
+        # Initialize interbank exposures and liability matrix
+        self._initialize_interbank_exposures()
+        self._build_liability_matrix()
+    
     def _initialize_interbank_exposures(self) -> None:
         """Initialize interbank lending relationships based on network edges."""
         for u, v in self.graph.edges():

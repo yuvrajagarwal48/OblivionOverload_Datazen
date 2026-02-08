@@ -46,6 +46,10 @@ class SimulationConfig(BaseModel):
     num_exchanges: int = Field(default=2, ge=1, le=5, description="Number of exchanges")
     num_ccps: int = Field(default=1, ge=1, le=3, description="Number of CCPs")
     seed: Optional[int] = Field(default=None, description="Random seed")
+    bank_ids: Optional[List[int]] = Field(default=None, description="Real bank IDs from registry to use")
+    bank_names: Optional[List[str]] = Field(default=None, description="Real bank names from registry to use")
+    synthetic_count: Optional[int] = Field(default=None, ge=0, le=50, description="Number of synthetic banks to add")
+    synthetic_stress: Optional[str] = Field(default="normal", description="Stress level for synthetic banks: normal, weak, distressed")
 
 
 class StepConfig(BaseModel):

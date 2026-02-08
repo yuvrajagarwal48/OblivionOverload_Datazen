@@ -51,6 +51,9 @@ class EnvConfig:
     
     # Seed
     seed: Optional[int] = None
+    
+    # Real bank configs (if provided, uses these instead of random generation)
+    real_bank_configs: Optional[List[Dict]] = None
 
 
 @dataclass
@@ -145,13 +148,16 @@ class FinancialEnvironment:
             self._rng = np.random.default_rng(seed)
             self.config.seed = seed
         
-        # Regenerate network
-        self.network.generate_network(
-            initial_cash_range=self.config.initial_cash_range,
-            initial_assets_range=self.config.initial_assets_range,
-            initial_ext_liab_range=self.config.initial_ext_liab_range,
-            min_capital_ratio=self.config.min_capital_ratio
-        )
+        # Regenerate network - use real banks if configured
+        if self.config.real_bank_configs:
+            self.network.generate_from_real_banks(self.config.real_bank_configs)
+        else:
+            self.network.generate_network(
+                initial_cash_range=self.config.initial_cash_range,
+                initial_assets_range=self.config.initial_assets_range,
+                initial_ext_liab_range=self.config.initial_ext_liab_range,
+                min_capital_ratio=self.config.min_capital_ratio
+            )
         
         # Reset market
         self.market.reset()

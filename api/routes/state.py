@@ -135,8 +135,13 @@ class SimulationState:
                    scenario: str = "normal",
                    num_exchanges: int = 2,
                    num_ccps: int = 1,
-                   seed: Optional[int] = None):
+                   seed: Optional[int] = None,
+                   real_bank_configs: Optional[List[Dict]] = None):
         """Initialize complete simulation."""
+        
+        # If real bank configs provided, override num_banks
+        if real_bank_configs:
+            num_banks = len(real_bank_configs)
         
         self.config = {
             "num_banks": num_banks,
@@ -144,7 +149,8 @@ class SimulationState:
             "scenario": scenario,
             "num_exchanges": num_exchanges,
             "num_ccps": num_ccps,
-            "seed": seed
+            "seed": seed,
+            "use_real_banks": real_bank_configs is not None
         }
         self.started_at = datetime.now().isoformat()
         
@@ -152,7 +158,8 @@ class SimulationState:
         env_config = EnvConfig(
             num_banks=num_banks,
             episode_length=episode_length,
-            seed=seed
+            seed=seed,
+            real_bank_configs=real_bank_configs
         )
         self.env = FinancialEnvironment(env_config)
         
@@ -244,6 +251,10 @@ class SimulationState:
                 "total_assets": bank.balance_sheet.total_assets,
                 "total_liabilities": bank.balance_sheet.total_liabilities,
             }
+            if hasattr(bank, 'name') and bank.name:
+                bank_states[bank_id]["name"] = bank.name
+            if hasattr(bank, 'metadata') and bank.metadata:
+                bank_states[bank_id]["metadata"] = bank.metadata
         
         # Create history entry
         entry = StepHistory(
@@ -365,7 +376,7 @@ class SimulationState:
                         # Route through infrastructure
                         routing = self.router.route_transaction(
                             source_bank=bank_id,
-                            transaction_type=TransactionType.INTERBANK_LENDING,
+                            transaction_type=TransactionType.INTERBANK_LEND,
                             amount=amount
                         )
                         
@@ -541,7 +552,12 @@ class SimulationState:
         
         # Predict
         if self.credit_risk_layer:
-            output = self.credit_risk_layer.predict(features)
+            output = self.credit_risk_layer.predict(
+                bank,
+                self.env.network,
+                self.env.market,
+                self.ccps[0] if self.ccps else None
+            )
             return output.to_dict()
         
         # Fallback heuristic

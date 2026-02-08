@@ -179,7 +179,8 @@ class RiskFeatures:
             concentration = 0.0
             largest_ratio = 0.0
         
-        interbank = bs.interbank_assets / max(bs.total_assets, 1e-8)
+        interbank_total = sum(bs.interbank_assets.values()) if isinstance(bs.interbank_assets, dict) else bs.interbank_assets
+        interbank = interbank_total / max(bs.total_assets, 1e-8)
         
         # Market features
         volatility = 0.02
@@ -196,7 +197,7 @@ class RiskFeatures:
         if ccp and hasattr(ccp, 'margin_accounts'):
             if bank.bank_id in ccp.margin_accounts:
                 account = ccp.margin_accounts[bank.bank_id]
-                margin_coverage = account.collateral_posted / max(account.initial_margin, 1e-8)
+                margin_coverage = account.total_margin / max(account.initial_margin, 1e-8)
         
         return cls(
             capital_ratio=capital_ratio,

@@ -14,7 +14,67 @@ from .models import (
     BankTransactionHistory, TransactionRecord, TransactionSummary
 )
 
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from data.bank_registry import bank_registry
+
 router = APIRouter(prefix="/bank", tags=["Banks"])
+
+
+def convert_numpy(obj):
+    """Recursively convert numpy types to native Python types."""
+    if isinstance(obj, dict):
+        return {k: convert_numpy(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_numpy(v) for v in obj]
+    elif isinstance(obj, (np.integer,)):
+        return int(obj)
+    elif isinstance(obj, (np.floating,)):
+        return float(obj)
+    elif isinstance(obj, np.bool_):
+        return bool(obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    return obj
+
+
+# ============================================================================
+# REAL BANK REGISTRY (must be before /{bank_id} to avoid route conflicts)
+# ============================================================================
+
+@router.get("/registry")
+async def get_bank_registry() -> Dict[str, Any]:
+    """Get all available real banks from the RBI data registry."""
+    all_banks = bank_registry.get_available_list()
+    return {
+        "count": len(all_banks),
+        "source": "RBI A Profile of Banks 2012-13",
+        "banks": all_banks
+    }
+
+
+@router.get("/registry/search")
+async def search_bank_registry(q: str = Query(..., min_length=1)) -> Dict[str, Any]:
+    """Search real banks by name."""
+    results = bank_registry.search_banks(q)
+    return {
+        "query": q,
+        "count": len(results),
+        "results": [
+            {"id": b.bank_id, "name": b.name, "tier": b.tier}
+            for b in results
+        ]
+    }
+
+
+@router.get("/registry/{bank_id}")
+async def get_registry_bank(bank_id: int) -> Dict[str, Any]:
+    """Get details of a specific bank from the registry."""
+    bank = bank_registry.get_bank_by_id(bank_id)
+    if not bank:
+        raise HTTPException(status_code=404, detail=f"Bank ID {bank_id} not found in registry")
+    return {"bank": bank.to_dict()}
 
 
 # ============================================================================
@@ -33,17 +93,25 @@ async def list_banks() -> Dict[str, Any]:
     banks = []
     for bank_id, bank in network.banks.items():
         # Calculate risk score
-        risk_score = simulation_state._heuristic_pd(bank) * 100
+        risk_score = float(simulation_state._heuristic_pd(bank)) * 100
         
-        banks.append({
-            "bank_id": bank_id,
-            "tier": bank.tier,
+        bank_entry = {
+            "bank_id": int(bank_id),
+            "tier": int(bank.tier),
             "status": bank.status.value,
-            "equity": round(bank.balance_sheet.equity, 2),
-            "capital_ratio": round(bank.capital_ratio, 4),
-            "cash": round(bank.balance_sheet.cash, 2),
-            "risk_score": round(risk_score, 1)
-        })
+            "equity": round(float(bank.balance_sheet.equity), 2),
+            "capital_ratio": round(float(bank.capital_ratio), 4),
+            "cash": round(float(bank.balance_sheet.cash), 2),
+            "risk_score": round(float(risk_score), 1)
+        }
+        # Include real bank name/metadata if available
+        if hasattr(bank, 'name') and bank.name:
+            bank_entry["name"] = bank.name
+        if hasattr(bank, 'metadata') and bank.metadata:
+            bank_entry["crar"] = bank.metadata.get("crar", 0)
+            bank_entry["net_npa_ratio"] = bank.metadata.get("net_npa_ratio", 0)
+        
+        banks.append(bank_entry)
     
     # Sort by risk score (highest first)
     banks.sort(key=lambda x: x["risk_score"], reverse=True)
@@ -52,8 +120,8 @@ async def list_banks() -> Dict[str, Any]:
         "count": len(banks),
         "banks": banks,
         "summary": {
-            "total_equity": sum(b["equity"] for b in banks),
-            "avg_capital_ratio": np.mean([b["capital_ratio"] for b in banks]),
+            "total_equity": round(float(sum(b["equity"] for b in banks)), 2),
+            "avg_capital_ratio": round(float(np.mean([b["capital_ratio"] for b in banks])), 4),
             "at_risk": len([b for b in banks if b["risk_score"] > 50])
         }
     }
@@ -103,15 +171,15 @@ async def get_bank_details(bank_id: int) -> Dict[str, Any]:
     if simulation_state.ccps:
         ccp = simulation_state.ccps[0]
         if bank_id in ccp.members:
-            member_state = ccp.get_member_state(bank_id)
+            member_state = ccp.get_member_margin_status(bank_id)
             if member_state:
                 margin_status = {
                     "ccp_id": ccp.ccp_id,
-                    "initial_margin": member_state.initial_margin,
-                    "variation_margin": member_state.variation_margin,
-                    "total_margin": member_state.total_margin,
-                    "margin_calls_pending": member_state.margin_calls_pending,
-                    "margin_adequacy": member_state.total_margin / max(bs.total_liabilities * 0.1, 1)
+                    "initial_margin": float(member_state.get("initial_margin", 0)),
+                    "variation_margin": float(member_state.get("variation_margin", 0)),
+                    "total_margin": float(member_state.get("total_margin", 0)),
+                    "margin_calls_pending": float(member_state.get("margin_calls_pending", 0)),
+                    "margin_adequacy": float(member_state.get("margin_adequacy", 1.0))
                 }
     
     # Calculate concentration
@@ -121,7 +189,7 @@ async def get_bank_details(bank_id: int) -> Dict[str, Any]:
     if exposures and sum(exposures) > 0:
         concentration_index = sum((e / sum(exposures)) ** 2 for e in exposures)
     
-    return {
+    return convert_numpy({
         "bank_id": bank_id,
         "tier": bank.tier,
         "status": bank.status.value,
@@ -185,7 +253,7 @@ async def get_bank_details(bank_id: int) -> Dict[str, Any]:
             "below_capital_minimum": bank.capital_ratio < 0.08,
             "high_leverage": (bs.total_assets / max(bs.equity, 1)) > 15
         }
-    }
+    })
 
 
 # ============================================================================
@@ -220,7 +288,7 @@ async def get_bank_history(
     # Format for charts
     timesteps = [h["timestep"] for h in history]
     
-    return {
+    return convert_numpy({
         "bank_id": bank_id,
         "count": len(history),
         "timesteps": timesteps,
@@ -233,7 +301,7 @@ async def get_bank_history(
             "cash": [h.get("cash", 0) for h in history],
             "status": [h.get("status", "active") for h in history]
         }
-    }
+    })
 
 
 # ============================================================================
@@ -272,7 +340,7 @@ async def get_bank_transactions(
     total_outflows = sum(t["amount"] for t in transactions if t.get("direction") == "outflow")
     counterparties = set(t.get("counterparty") for t in transactions if t.get("counterparty", -1) >= 0)
     
-    return {
+    return convert_numpy({
         "bank_id": bank_id,
         "count": len(transactions),
         "transactions": transactions,
@@ -285,7 +353,7 @@ async def get_bank_transactions(
             "avg_transaction_size": round((total_inflows + total_outflows) / max(len(transactions), 1), 2),
             "counterparty_count": len(counterparties)
         }
-    }
+    })
 
 
 # ============================================================================
@@ -342,7 +410,7 @@ async def get_bank_exposures(bank_id: int) -> Dict[str, Any]:
     total_liabilities = sum(l["amount"] for l in liabilities)
     exposure_to_defaults = sum(a["amount"] for a in assets if a["at_risk"])
     
-    return {
+    return convert_numpy({
         "bank_id": bank_id,
         
         "assets": {
@@ -364,7 +432,7 @@ async def get_bank_exposures(bank_id: int) -> Dict[str, Any]:
             "largest_asset_exposure": assets[0]["amount"] if assets else 0,
             "largest_liability_exposure": liabilities[0]["amount"] if liabilities else 0
         }
-    }
+    })
 
 
 # ============================================================================
@@ -400,10 +468,10 @@ async def compare_banks(
                 "pd": round(simulation_state._heuristic_pd(bank), 4)
             })
     
-    return {
+    return convert_numpy({
         "banks": comparison,
         "metrics": ["equity", "capital_ratio", "cash", "total_assets", "leverage", "pd"]
-    }
+    })
 
 
 # ============================================================================
@@ -438,7 +506,7 @@ async def get_stressed_banks() -> Dict[str, Any]:
         elif bank.capital_ratio < 0.08:
             stressed.append(info)
     
-    return {
+    return convert_numpy({
         "stressed": {
             "count": len(stressed),
             "banks": stressed
@@ -456,4 +524,4 @@ async def get_stressed_banks() -> Dict[str, Any]:
             "total_defaulted": len(defaulted),
             "system_health": "healthy" if len(critical) == 0 else ("stressed" if len(defaulted) == 0 else "crisis")
         }
-    }
+    })
