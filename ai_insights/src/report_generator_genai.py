@@ -133,9 +133,8 @@ Powered by Featherless API with Kimi-K2-Thinking Model*
 """
         
         if filepath:
-            with open(filepath, 'w') as f:
+            with open(filepath, 'w', encoding='utf-8') as f:
                 f.write(report)
-            print(f"✅ Markdown report saved to {filepath}")
         
         return report
     
@@ -360,9 +359,8 @@ Powered by Featherless API with Kimi-K2-Thinking Model*
 </html>"""
         
         if filepath:
-            with open(filepath, 'w') as f:
+            with open(filepath, 'w', encoding='utf-8') as f:
                 f.write(html)
-            print(f"✅ HTML report saved to {filepath}")
         
         return html
     

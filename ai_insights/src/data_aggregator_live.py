@@ -361,6 +361,6 @@ class DataAggregatorLive:
     def export_to_json(self, filepath: str) -> str:
         """Export aggregated metrics to JSON"""
         data = self.to_dict()
-        with open(filepath, "w") as f:
+        with open(filepath, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, default=str)
         return filepath

@@ -382,10 +382,10 @@ class SimulationState:
                             price=market_price
                         )
                         
-                        if routing:
+                        if routing and routing.feasible:
                             stats["transactions_processed"] += 1
-                            stats["exchange_fees"] += routing.get("fee", 0)
-                            delays.append(routing.get("delay", 0))
+                            stats["exchange_fees"] += routing.estimated_fee
+                            delays.append(routing.estimated_delay)
                             
                             # Collect margin at CCP
                             for ccp in self.ccps:
