@@ -46,6 +46,9 @@ export const initSimulation = (config = {}) =>
     episode_length: config.episode_length ?? 100,
     scenario: config.scenario ?? 'normal',
     seed: config.seed ?? null,
+    banks: config.banks ?? undefined,
+    ccps: config.ccps ?? undefined,
+    market: config.market ?? undefined,
   });
 
 /** POST /simulation/reset */
@@ -85,6 +88,50 @@ export const getRiskMetrics = () => get('/metrics/risk');
 export const getBankDetails = (bankId) => get(`/metrics/bank/${bankId}`);
 
 // ═══════════════════════════════════════════════════════════════
+// BANK ENDPOINTS (from ai branch API)
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * GET /api/bank/{bank_id}/history — time series of bank metrics.
+ * Query params: start, end
+ * Response: { bank_id, count, timesteps, data, series }
+ */
+export const getBankHistory = (bankId, start = 0, end = null) => {
+  const params = new URLSearchParams({ start: start.toString() });
+  if (end !== null) params.append('end', end.toString());
+  return get(`/api/bank/${bankId}/history?${params}`);
+};
+
+/**
+ * GET /api/bank/{bank_id}/transactions — transaction history.
+ * Query params: limit, tx_type
+ * Response: { bank_id, count, transactions, summary }
+ */
+export const getBankTransactions = (bankId, limit = 100, txType = null) => {
+  const params = new URLSearchParams({ limit: limit.toString() });
+  if (txType) params.append('tx_type', txType);
+  return get(`/api/bank/${bankId}/transactions?${params}`);
+};
+
+/**
+ * GET /api/bank/{bank_id}/exposures — detailed exposure breakdown.
+ * Response: { bank_id, assets, liabilities, summary }
+ */
+export const getBankExposures = (bankId) => get(`/api/bank/${bankId}/exposures`);
+
+/**
+ * GET /api/bank/ — list all banks with summary.
+ * Response: { count, banks, summary }
+ */
+export const listBanks = () => get('/api/bank/');
+
+/**
+ * GET /api/bank/stressed — get stressed/critical banks.
+ * Response: { stressed, critical, defaulted, summary }
+ */
+export const getStressedBanks = () => get('/api/bank/stressed');
+
+// ═══════════════════════════════════════════════════════════════
 // NETWORK
 // ═══════════════════════════════════════════════════════════════
 
@@ -112,7 +159,40 @@ export const applyShock = (shock) => post('/scenarios/shock', shock);
 // WHAT-IF & RECOMMENDATIONS
 // ═══════════════════════════════════════════════════════════════
 
-/** POST /what_if */
+/**
+ * POST /api/whatif/analyze — comprehensive what-if transaction analysis.
+ * Body: {
+ *   transaction_type: string,  // 'loan_approval', 'margin_increase', 'borrow', 'sell_assets'
+ *   initiator_id: int,
+ *   counterparty_id: int (optional),
+ *   amount: float,
+ *   interest_rate: float (default 0.05),
+ *   duration: int (default 10),
+ *   collateral: float (default 0),
+ *   horizon: int (default 10),
+ *   num_simulations: int (default 20)
+ * }
+ * Response: {
+ *   analysis_id, transaction, baseline, counterfactual, deltas,
+ *   risk_assessment, recommendation, simulation_info
+ * }
+ */
+export const analyzeTransaction = (payload) => post('/api/whatif/analyze', payload);
+
+/**
+ * GET /api/whatif/quick-check/{bank_id} — quick risk check.
+ * Query params: amount, transaction_type
+ * Response: { bank_id, current_state, post_transaction, assessment }
+ */
+export const quickRiskCheck = (bankId, amount, transactionType = 'loan_approval') => {
+  const params = new URLSearchParams({
+    amount: amount.toString(),
+    transaction_type: transactionType
+  });
+  return get(`/api/whatif/quick-check/${bankId}?${params}`);
+};
+
+/** POST /what_if — LEGACY endpoint (basic action vector) */
 export const whatIf = (payload) => post('/what_if', payload);
 
 /** GET /recommendations/{bankId} */

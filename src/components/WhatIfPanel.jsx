@@ -75,6 +75,9 @@ export default function WhatIfPanel({ neighborNodes = [] }) {
         });
       } else {
         // ─── Real API call ───
+        // Try using the simple /what_if endpoint (legacy, doesn't require /api/whatif/analyze)
+        // This endpoint uses action vectors and works even if simulation is in progress
+        
         // Map tx type to action vector: [lend_pct, borrow_pct, sell_pct, hold_pct]
         const actionMap = {
           LEND:        [1.0, 0.0, 0.0, 0.0],
@@ -89,22 +92,36 @@ export default function WhatIfPanel({ neighborNodes = [] }) {
         });
 
         // Parse backend response
-        // data could be: { current_state, proposed_action, projected_outcomes, risk_assessment, ... }
-        const riskBefore = data.current_state?.capital_ratio ?? data.risk_before ?? 0.08;
-        const riskAfter = data.projected_outcomes?.capital_ratio ?? data.risk_after ?? riskBefore;
-        const pass = (data.risk_assessment?.passes_threshold !== false) && riskAfter >= 0.04;
+        // Response structure from legacy endpoint may vary
+        const riskBefore = data.current_state?.capital_ratio ?? data.baseline?.capital_ratio ?? 0.08;
+        const riskAfter = data.projected_outcome?.capital_ratio ?? data.counterfactual?.capital_ratio ?? riskBefore;
+        
+        // Check if transaction passes
+        const pass = data.passes_threshold !== false && riskAfter >= 0.04;
+        
+        // Build message
+        let message = data.explanation || data.message || '';
+        if (data.recommendation?.reasons) {
+          message = data.recommendation.reasons.join('; ');
+        }
+        if (!message) {
+          message = pass 
+            ? 'Transaction passes risk thresholds.' 
+            : 'Transaction fails risk assessment.';
+        }
 
         setResult({
           pass,
           riskBefore,
           riskAfter,
-          message: data.risk_assessment?.explanation ||
-                   data.recommendation?.reason ||
-                   (pass ? 'Transaction passes risk thresholds.' : 'Transaction fails risk assessment.'),
+          message,
+          riskScore: data.risk_score,
+          riskCategory: data.risk_category,
           details: data, // store full response for debugging
         });
       }
     } catch (err) {
+      console.error('What-If simulation error:', err);
       setResult({ pass: false, message: `Simulation error: ${err.message}` });
     } finally {
       setSimulating(false);

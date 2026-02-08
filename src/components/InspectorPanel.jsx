@@ -1,6 +1,6 @@
 import React from 'react';
 import useSimulationStore from '../store/simulationStore';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, LogIn } from 'lucide-react';
 import './InspectorPanel.css';
 
 function Sparkline({ data }) {
@@ -40,6 +40,8 @@ function InspectorPanel() {
   const toggleBankSelection = useSimulationStore((state) => state?.selectBank);
   const deselectBank = useSimulationStore((state) => state?.deselectBank);
   const clearBankSelection = useSimulationStore((state) => state?.clearBankSelection);
+  const loginAsBank = useSimulationStore((state) => state?.loginAsBank);
+  const currentBankId = useSimulationStore((state) => state?.currentBankId);
 
   // Show placeholder if simulation not initialized
   if (!backendInitialized || nodes.length === 0) {
@@ -82,6 +84,33 @@ function InspectorPanel() {
           Clear Selection ({selectedBanks.length})
         </button>
       </div>
+
+      {/* ── Login as Bank Section ── */}
+      {nodes.length > 0 && (
+        <div className="inspector-login-section">
+          <h3 className="inspector-section-title">🔑 Login as Bank</h3>
+          <div className="inspector-login-grid">
+            {nodes
+              .filter(n => (n.node_type || 'bank') !== 'ccp' && !String(n.id).startsWith('CCP'))
+              .map((node) => (
+                <button
+                  key={node.id}
+                  className={`inspector-login-btn ${String(node.id) === String(currentBankId) ? 'active' : ''}`}
+                  onClick={() => loginAsBank(String(node.id))}
+                  title={`Login as ${node.label || `Bank ${node.id}`}`}
+                >
+                  <LogIn size={12} />
+                  <span>{node.label || `B${node.id}`}</span>
+                </button>
+              ))}
+          </div>
+          {currentBankId && (
+            <div className="inspector-current-bank">
+              ✅ Viewing as: <strong>{nodes.find(n => String(n.id) === String(currentBankId))?.label || `Bank ${currentBankId}`}</strong>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Selected Banks Detail View */}
       {selectedBanks.length > 0 && (

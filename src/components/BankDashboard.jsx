@@ -4,6 +4,7 @@ import { USE_MOCK } from '../config';
 import * as api from '../services/api';
 import WhatIfPanel from './WhatIfPanel';
 import TransactionHistory from './TransactionHistory';
+import { ArrowLeft } from 'lucide-react';
 import './BankDashboard.css';
 
 /**
@@ -97,6 +98,8 @@ export default function BankDashboard() {
   // Sparkline for own capital ratio
   const myHistory = bankHistory[String(currentBankId)] || [];
 
+  const switchToObserver = useSimulationStore((s) => s.switchToObserver);
+
   const getHealthColor = (ratio) => {
     if (ratio == null) return '#64748b';
     if (ratio >= 0.08) return '#10b981';
@@ -106,6 +109,12 @@ export default function BankDashboard() {
 
   return (
     <div className="bank-dashboard">
+      {/* ── Back to Observer ── */}
+      <button className="bd-back-btn" onClick={switchToObserver}>
+        <ArrowLeft size={14} />
+        <span>Back to Inspector</span>
+      </button>
+
       {/* ── Header ── */}
       <div className="bd-header">
         <div className="bd-bank-identity">

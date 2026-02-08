@@ -196,13 +196,26 @@ export default function NetworkGraph() {
   }, [events]);
 
   // Set up click handler for bank selection
+  const loginAsBank = useSimulationStore((s) => s.loginAsBank);
+
   const handleCyInit = useCallback(
     (cy) => {
       cyRef.current = cy;
 
+      // Single click to select
       cy.on('tap', 'node', (evt) => {
         const nodeId = evt.target.id();
         toggleBankSelection(nodeId);
+      });
+
+      // Double click to login as bank
+      cy.on('dbltap', 'node', (evt) => {
+        const nodeId = evt.target.id();
+        const nodeData = evt.target.data();
+        // Only allow login to bank nodes, not CCPs
+        if (nodeData.node_type !== 'ccp' && !nodeId.startsWith('CCP')) {
+          loginAsBank(nodeId);
+        }
       });
 
       // Light background interaction
@@ -211,7 +224,7 @@ export default function NetworkGraph() {
         'active-bg-opacity': 0.08,
       });
     },
-    [toggleBankSelection]
+    [toggleBankSelection, loginAsBank]
   );
 
   // Reset cy state when simulation resets
@@ -230,7 +243,11 @@ export default function NetworkGraph() {
           <div className="placeholder-text">Select a scenario and run the simulation</div>
           <div className="placeholder-sub">The network graph will appear here</div>
         </div>
-      ) : null}
+      ) : (
+        <div className="graph-hint">
+          <span className="hint-text">💡 Double-click any bank to login as that bank</span>
+        </div>
+      )}
       <CytoscapeComponent
         elements={[]}
         stylesheet={getCytoscapeStylesheet()}

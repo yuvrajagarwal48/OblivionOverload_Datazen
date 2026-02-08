@@ -200,6 +200,15 @@ function LandingPage() {
 
   return (
     <div className="landing">
+      {/* Skip to Login button */}
+      <button 
+        className="landing-skip-btn" 
+        onClick={handleEnter}
+        title="Skip to Login"
+      >
+        Skip to Login →
+      </button>
+
       {/* ── Left: Text Content ── */}
       <div className="landing-left">
         <div className="landing-content">

@@ -22,6 +22,8 @@ export default function BankViewPanel() {
   const clearBankSelection = useSimulationStore((s) => s.clearBankSelection);
   const bankViewOpen = useSimulationStore((s) => s.bankViewOpen);
   const toggleBankView = useSimulationStore((s) => s.toggleBankView);
+  const currentBankId = useSimulationStore((s) => s.currentBankId);
+  const loginAsBank = useSimulationStore((s) => s.loginAsBank);
 
   // Get full node data for selected banks
   const selectedNodes = selectedBanks
@@ -29,6 +31,9 @@ export default function BankViewPanel() {
     .filter(Boolean);
 
   const hasSelection = selectedNodes.length > 0;
+
+  // All bank nodes (not CCPs) for login list
+  const allBankNodes = nodes.filter(n => (n.node_type || 'bank') !== 'ccp' && !String(n.id).startsWith('CCP'));
 
   return (
     <>
@@ -51,6 +56,35 @@ export default function BankViewPanel() {
           )}
         </div>
 
+        {/* ── Login as Bank Section ── */}
+        {allBankNodes.length > 0 && (
+          <div className="bank-login-section">
+            <h4 className="bank-login-section-title">🔑 Login as Bank</h4>
+            <div className="bank-login-grid">
+              {allBankNodes.map((node) => (
+                <button
+                  key={node.id}
+                  className={`bank-login-grid-btn ${String(node.id) === String(currentBankId) ? 'active' : ''}`}
+                  onClick={() => loginAsBank(String(node.id))}
+                  title={`Login as Bank ${node.id}`}
+                >
+                  <span className="login-grid-dot" style={{ 
+                    background: node.status === 'defaulted' ? '#ef4444' 
+                      : node.status === 'active' ? '#10b981' : '#f59e0b'
+                  }} />
+                  <span className="login-grid-name">{node.label || `B${node.id}`}</span>
+                </button>
+              ))}
+            </div>
+            {currentBankId && (
+              <div className="current-bank-badge">
+                Viewing as: <strong>Bank {currentBankId}</strong>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Selected Bank Details ── */}
         {!hasSelection ? (
           <div className="bank-view-empty">
             <p>Click on nodes in the graph to inspect banks</p>
@@ -82,11 +116,17 @@ export default function BankViewPanel() {
  * Individual bank card with insights
  */
 function BankCard({ node, history, onRemove }) {
+  const loginAsBank = useSimulationStore((s) => s.loginAsBank);
+  
   const statusColor = node.status === 'defaulted'
     ? '#f85149'
     : node.status === 'active'
     ? '#3fb950'
     : '#e3b341';
+
+  const handleLogin = () => {
+    loginAsBank(String(node.id));
+  };
 
   return (
     <div className="bank-card">
@@ -102,6 +142,13 @@ function BankCard({ node, history, onRemove }) {
           <span className={`bank-tier tier-${node.tier}`}>
             Tier {node.tier}
           </span>
+          <button 
+            className="bank-login-btn" 
+            onClick={handleLogin}
+            title="Login as this bank"
+          >
+            🔑 Login
+          </button>
           <button className="bank-remove-btn" onClick={onRemove}>
             ×
           </button>

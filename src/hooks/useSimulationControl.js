@@ -153,12 +153,14 @@ export default function useSimulationControl() {
     setApiLoading(true);
     try {
       // Build config from manual setup or use defaults
+      const numBanksFromConfig = manualConfig.banks.length > 0 ? manualConfig.banks.length : 10;
+      
       const initConfig = useManualSetup ? {
-        num_banks: manualConfig.banks.length || 5,
+        num_banks: numBanksFromConfig,
         episode_length: manualConfig.market.episode_length || 100,
         scenario: 'custom',
-        banks: manualConfig.banks,
-        ccps: manualConfig.ccps,
+        banks: manualConfig.banks.length > 0 ? manualConfig.banks : undefined,
+        ccps: manualConfig.ccps.length > 0 ? manualConfig.ccps : undefined,
         market: manualConfig.market,
       } : {
         num_banks: 5,
@@ -166,12 +168,33 @@ export default function useSimulationControl() {
         scenario: 'normal',
       };
 
+      console.log('[API] Initializing with config:', initConfig);
+
       // Initialize simulation via legacy endpoint
       await api.initSimulation(initConfig);
       setBackendInitialized(true);
 
       // Fetch initial state
       await fetchFullState();
+
+      // If manual setup has CCPs, inject them as nodes if backend didn't
+      if (useManualSetup && manualConfig.ccps.length > 0) {
+        const currentNodes = useSimulationStore.getState().nodes;
+        const ccpNodes = manualConfig.ccps
+          .filter(ccp => !currentNodes.find(n => String(n.id) === String(ccp.id)))
+          .map(ccp => ({
+            id: ccp.id,
+            label: ccp.name || `CCP-${ccp.id}`,
+            node_type: 'ccp',
+            tier: 0,
+            capital_ratio: 1.0,
+            stress: 0,
+            status: 'active',
+          }));
+        if (ccpNodes.length > 0) {
+          ingestTopologyNodes([...currentNodes, ...ccpNodes]);
+        }
+      }
 
       setSimStatus('running');
       setApiLoading(false);
@@ -188,7 +211,7 @@ export default function useSimulationControl() {
       return false;
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedScenario, setSimStatus, setApiLoading, setApiError, setBackendInitialized, fetchFullState, startPolling]);
+  }, [selectedScenario, useManualSetup, manualConfig, setSimStatus, setApiLoading, setApiError, setBackendInitialized, fetchFullState, startPolling]);
 
   // ─── Play ───
   const play = useCallback(async () => {

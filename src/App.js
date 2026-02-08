@@ -1,7 +1,6 @@
 import React, { useState, useCallback, useRef } from 'react';
 import useSimulationStore from './store/simulationStore';
 import useWebSocket from './hooks/useWebSocket';
-import LoginPage from './components/LoginPage';
 import LandingPage from './components/LandingPage';
 import ActivityBar from './components/ActivityBar';
 import ScenarioSelector from './components/ScenarioSelector';
@@ -33,7 +32,6 @@ import './App.css';
  * └────┴──────────┴──────────────────────┴───────────────┘
  */
 function App() {
-  const isAuthenticated = useSimulationStore((s) => s?.isAuthenticated ?? false);
   const restrictedMode = useSimulationStore((s) => s?.restrictedMode ?? false);
   const showLanding = useSimulationStore((s) => s?.showLanding ?? true);
   const simStatus = useSimulationStore((s) => s?.simStatus || 'idle');
@@ -103,14 +101,9 @@ function App() {
   // Activate WebSocket connection management
   useWebSocket();
 
-  // Entry flow: Landing → Login → Main App
+  // Entry flow: Landing → Main App (bank login is now in the sidebar)
   if (showLanding) {
     return <LandingPage />;
-  }
-
-  // Auth gate — show login after landing
-  if (!isAuthenticated) {
-    return <LoginPage />;
   }
 
   const handleActivityClick = (id) => {

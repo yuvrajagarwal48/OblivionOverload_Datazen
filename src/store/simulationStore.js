@@ -624,6 +624,29 @@ const useSimulationStore = create((set, get) => ({
       showLanding: false, // skip landing after login
     }),
 
+  loginAsBank: (bankId) => {
+    const state = get();
+    const bankNode = state.nodes.find(n => String(n.id) === String(bankId));
+    if (bankNode) {
+      set({
+        currentBankId: String(bankId),
+        currentBankData: {
+          bank_id: bankNode.id,
+          name: bankNode.label || `Bank ${bankNode.id}`,
+          tier: bankNode.tier,
+          node_type: bankNode.node_type || 'bank',
+        },
+        restrictedMode: true,
+      });
+    }
+  },
+
+  switchToObserver: () => set({
+    restrictedMode: false,
+    currentBankId: null,
+    currentBankData: null,
+  }),
+
   logout: () =>
     set({
       isAuthenticated: false,
@@ -682,7 +705,7 @@ const useSimulationStore = create((set, get) => ({
 
   // ─── Actions: View Navigation ───
   setActiveView: (view) => set({ activeView: view }),
-  enterApp: () => set({ showLanding: false }),
+  enterApp: () => set({ showLanding: false, isAuthenticated: true }),
 
   // ─── Actions: Node Decisions ───
   setNodeDecision: (nodeId, decision) => set((state) => ({

@@ -13,6 +13,34 @@
   display: flex;
 }
 
+/* ─── Skip to Login Button ─── */
+.landing-skip-btn {
+  position: fixed;
+  top: 20px;
+  right: 24px;
+  z-index: 10;
+  padding: 10px 20px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 8px;
+  color: #3b82f6;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.landing-skip-btn:hover {
+  background: #3b82f6;
+  color: #ffffff;
+  border-color: #3b82f6;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
 /* ─── Left Panel: Text Content ─── */
 .landing-left {
   flex: 0 0 45%;

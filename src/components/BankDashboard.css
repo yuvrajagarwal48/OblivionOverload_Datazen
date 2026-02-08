@@ -11,6 +11,29 @@
   background: var(--bg-primary);
 }
 
+/* Back to Observer */
+.bd-back-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  margin: 10px 16px 0;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  color: #3b82f6;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.bd-back-btn:hover {
+  background: #dbeafe;
+  border-color: #3b82f6;
+}
+
 /* Header */
 .bd-header {
   display: flex;
