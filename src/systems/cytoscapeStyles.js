@@ -166,7 +166,7 @@ export function getCytoscapeStylesheet() {
         'label': (ele) => ele.data('activity_label') || '',
         'font-size': '10px',
         'font-weight': '700',
-        'color': '#1e293b',
+        'color': '#000000',
         'text-background-color': '#ffffff',
         'text-background-opacity': 0.95,
         'text-background-padding': '4px',

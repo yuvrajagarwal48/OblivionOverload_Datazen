@@ -166,5 +166,36 @@ export const whatIf = (payload) => post('/what_if', payload);
 /** GET /recommendations/{bankId} */
 export const getRecommendation = (bankId) => get(`/recommendations/${bankId}`);
 
+// ═══════════════════════════════════════════════════════════════
+// AI INSIGHTS (GenAI analysis & reports)
+// ═══════════════════════════════════════════════════════════════
+
+/** POST /api/ai-insights/generate — generate comprehensive AI analysis */
+export const generateAIAnalysis = (config = {}) => post('/api/ai-insights/generate', config);
+
+/** GET /api/ai-insights/report/json — latest analysis as structured JSON */
+export const getAIReport = () => get('/api/ai-insights/report/json');
+
+/** GET /api/ai-insights/report/text — latest analysis as plain text */
+export const getAIReportText = () =>
+  request('/api/ai-insights/report/text').then(r => r).catch(async (err) => {
+    // text endpoint returns plain text, re-fetch as text
+    const res = await fetch(`${API_BASE_URL}/api/ai-insights/report/text`);
+    if (!res.ok) throw new Error(`API ${res.status}`);
+    return res.text();
+  });
+
+/** GET /api/ai-insights/metrics — raw aggregated metrics */
+export const getAIMetrics = () => get('/api/ai-insights/metrics');
+
+/** GET /api/ai-insights/risk-scores — risk assessment scores (0-100) */
+export const getAIRiskScores = () => get('/api/ai-insights/risk-scores');
+
+/** GET /api/ai-insights/recommendations — policy recommendations */
+export const getAIRecommendations = () => get('/api/ai-insights/recommendations');
+
+/** GET /api/ai-insights/bank-insights — per-bank AI insights */
+export const getAIBankInsights = () => get('/api/ai-insights/bank-insights');
+
 /** GET /health */
 export const healthCheck = () => get('/health');

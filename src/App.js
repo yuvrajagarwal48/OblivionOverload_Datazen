@@ -13,6 +13,7 @@ import BankDashboard from './components/BankDashboard';
 import RiskMetricsPanel from './components/RiskMetricsPanel';
 import MarketDataPanel from './components/MarketDataPanel';
 import ActivityLog from './components/ActivityLog';
+import AIInsightsPanel from './components/AIInsightsPanel';
 import { Zap, LogOut, AlertCircle } from 'lucide-react';
 import './App.css';
 
@@ -247,12 +248,19 @@ function App() {
                   >
                     Market Data
                   </button>
+                  <button 
+                    className={`bottom-tab ${bottomTab === 'ai' ? 'active' : ''}`}
+                    onClick={() => setBottomTab('ai')}
+                  >
+                    AI Insights
+                  </button>
                 </div>
                 <div className="bottom-panel-content">
                   {bottomTab === 'activity' && <ActivityLog />}
                   {bottomTab === 'events' && <AnalyticsPanel />}
                   {bottomTab === 'risk' && <RiskMetricsPanel />}
                   {bottomTab === 'market' && <MarketDataPanel />}
+                  {bottomTab === 'ai' && <AIInsightsPanel />}
                 </div>
               </div>
             </>
