@@ -374,10 +374,12 @@ class SimulationState:
                     
                     if amount > 100:
                         # Route through infrastructure
+                        market_price = self.env.market.price if hasattr(self.env.market, 'price') else 100.0
                         routing = self.router.route_transaction(
                             source_bank=bank_id,
                             transaction_type=TransactionType.INTERBANK_LEND,
-                            amount=amount
+                            amount=amount,
+                            price=market_price
                         )
                         
                         if routing:
