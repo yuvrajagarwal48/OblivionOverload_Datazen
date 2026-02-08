@@ -15,9 +15,9 @@ const TX_TYPES = [
 /**
  * WhatIfPanel — Transaction proposal + simulation.
  *
- * API mode: POST /what_if  (legacy endpoint in main.py)
- *   Body: { bank_id, action: [lend_pct, borrow_pct, sell_pct, hold_pct] }
- *   Returns: counterfactual analysis with risk deltas
+ * API mode: POST /api/whatif/analyze  (modular endpoint)
+ *   Body: { transaction_type, initiator_id, counterparty_id, amount, ... }
+ *   Returns: baseline vs counterfactual + risk assessment + recommendation
  *
  * Mock mode: local mock evaluator
  */
@@ -75,38 +75,39 @@ export default function WhatIfPanel({ neighborNodes = [] }) {
         });
       } else {
         // ─── Real API call ───
-        // Try using the simple /what_if endpoint (legacy, doesn't require /api/whatif/analyze)
-        // This endpoint uses action vectors and works even if simulation is in progress
-        
-        // Map tx type to action vector: [lend_pct, borrow_pct, sell_pct, hold_pct]
-        const actionMap = {
-          LEND:        [1.0, 0.0, 0.0, 0.0],
-          BORROW:      [0.0, 1.0, 0.0, 0.0],
-          SELL_ASSETS:  [0.0, 0.0, 1.0, 0.0],
+        // Use modular POST /api/whatif/analyze (WhatIfTransactionRequest)
+        const txTypeMap = {
+          LEND: 'loan_approval',
+          BORROW: 'loan_approval',   // same tx type, just reversed perspective
+          SELL_ASSETS: 'margin_increase',
         };
-        const action = actionMap[txType] || [0, 0, 0, 1];
 
-        const data = await api.whatIf({
-          bank_id: Number(currentBankId),
-          action,
+        const data = await api.analyzeTransaction({
+          transaction_type: txTypeMap[txType] || 'loan_approval',
+          initiator_id: Number(currentBankId),
+          counterparty_id: Number(counterparty),
+          amount: Number(amount),
         });
 
-        // Parse backend response
-        // Response structure from legacy endpoint may vary
-        const riskBefore = data.current_state?.capital_ratio ?? data.baseline?.capital_ratio ?? 0.08;
-        const riskAfter = data.projected_outcome?.capital_ratio ?? data.counterfactual?.capital_ratio ?? riskBefore;
-        
-        // Check if transaction passes
-        const pass = data.passes_threshold !== false && riskAfter >= 0.04;
-        
-        // Build message
-        let message = data.explanation || data.message || '';
-        if (data.recommendation?.reasons) {
+        // Parse modular endpoint response
+        const riskBefore = data.baseline?.initiator_capital_ratio ?? 0.08;
+        const riskAfter = data.counterfactual?.initiator_capital_ratio ?? riskBefore;
+
+        // Recommendation-based pass/fail
+        const decision = data.recommendation?.decision ?? '';
+        const pass = decision === 'approve' || decision === 'approve_with_conditions';
+
+        // Build message from recommendation reasons
+        let message = '';
+        if (data.recommendation?.reasons?.length > 0) {
           message = data.recommendation.reasons.join('; ');
         }
+        if (data.recommendation?.conditions?.length > 0) {
+          message += (message ? ' | ' : '') + 'Conditions: ' + data.recommendation.conditions.join('; ');
+        }
         if (!message) {
-          message = pass 
-            ? 'Transaction passes risk thresholds.' 
+          message = pass
+            ? 'Transaction passes risk thresholds.'
             : 'Transaction fails risk assessment.';
         }
 
@@ -115,8 +116,8 @@ export default function WhatIfPanel({ neighborNodes = [] }) {
           riskBefore,
           riskAfter,
           message,
-          riskScore: data.risk_score,
-          riskCategory: data.risk_category,
+          riskScore: data.risk_assessment?.overall_risk_score,
+          riskCategory: data.risk_assessment?.risk_category,
           details: data, // store full response for debugging
         });
       }

@@ -154,12 +154,13 @@ export default function CustomSetup() {
                   </div>
                   <div className="entity-list">
                     {banks.map((bank) => {
-                      const isSelected = selectedRealBanks.includes(bank.bank_id);
+                      const bankId = bank.bank_id ?? bank.id;
+                      const isSelected = selectedRealBanks.includes(bankId);
                       return (
                         <div
-                          key={bank.bank_id}
+                          key={bankId}
                           className={`entity-card registry-bank-card ${isSelected ? 'selected' : ''}`}
-                          onClick={() => !isDisabled && toggleRealBank(bank.bank_id)}
+                          onClick={() => !isDisabled && toggleRealBank(bankId)}
                         >
                           <div className="entity-header">
                             <div className="registry-bank-name">

@@ -65,16 +65,17 @@ export default function useSimulationControl() {
           ingestMetrics(data);
         }
       }
-      if (topoRes.status === 'fulfilled') {
-        if (topoRes.value.edges) ingestEdges(topoRes.value.edges);
-        if (topoRes.value.nodes) {
-          ingestTopologyNodes(topoRes.value.nodes);
+      if (topoRes.status === 'fulfilled' && topoRes.value) {
+        const topo = topoRes.value;
+        if (topo.edges && topo.edges.length > 0) ingestEdges(topo.edges);
+        if (topo.nodes && topo.nodes.length > 0) {
+          ingestTopologyNodes(topo.nodes);
           if (stateRes.status !== 'fulfilled') {
-            ingestMetrics({ banks: Object.fromEntries(topoRes.value.nodes.map(n => [n.id, n])), step: 0 });
+            ingestMetrics({ banks: Object.fromEntries(topo.nodes.map(n => [n.id, n])), step: 0 });
           }
         }
       }
-      if (riskRes.status === 'fulfilled') {
+      if (riskRes.status === 'fulfilled' && riskRes.value) {
         ingestRiskMetrics(riskRes.value);
       }
     } catch (err) {

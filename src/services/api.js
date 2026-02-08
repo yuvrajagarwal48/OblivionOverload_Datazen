@@ -84,8 +84,15 @@ export const getSimulationStatus = () => get('/api/simulation/status');
 /** GET /metrics — legacy full state (fallback) */
 export const getMetrics = () => get('/metrics');
 
-/** GET /metrics/risk — comprehensive risk analysis (DebtRank etc.) */
-export const getRiskMetrics = () => get('/metrics/risk');
+/** GET /api/analytics/systemic-risk — comprehensive risk analysis (DebtRank etc.) */
+export const getRiskMetrics = () =>
+  get('/api/analytics/systemic-risk').catch(() => get('/metrics/risk'));
+
+/** GET /api/analytics/debtrank — individual bank DebtRank rankings */
+export const getDebtRank = () => get('/api/analytics/debtrank');
+
+/** GET /api/analytics/credit-risk — system-wide credit risk */
+export const getCreditRisk = () => get('/api/analytics/credit-risk');
 
 /** GET /metrics/bank/{id} — legacy detailed bank info */
 export const getLegacyBankDetails = (bankId) => get(`/metrics/bank/${bankId}`);
@@ -124,8 +131,9 @@ export const getStressedBanks = () => get('/api/bank/stressed');
 // NETWORK
 // ═══════════════════════════════════════════════════════════════
 
-/** GET /network/topology — nodes + edges for graph (legacy) */
-export const getNetworkTopology = () => get('/network/topology');
+/** GET /api/analytics/network/graph — nodes + edges for graph visualization */
+export const getNetworkTopology = () =>
+  get('/api/analytics/network/graph').catch(() => get('/network/topology'));
 
 // ═══════════════════════════════════════════════════════════════
 // SCENARIOS & SHOCKS (legacy)

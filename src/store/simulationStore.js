@@ -145,6 +145,39 @@ const useSimulationStore = create((set, get) => ({
   clearRealBankSelection: () => set({ selectedRealBanks: [] }),
   setBankNameMap: (map) => set({ bankNameMap: map }),
 
+  // ─── Helper: generate edges from node list (BA-like topology) ───
+  _generateEdgesFromNodes: (nodeList) => {
+    if (!nodeList || nodeList.length < 2) return [];
+    const edges = [];
+    const ids = nodeList.map((n) => String(n.id));
+    const edgesPerNode = 2;
+    const seen = new Set();
+    // Simple deterministic preferential-attachment-like wiring
+    for (let i = 1; i < ids.length; i++) {
+      const targets = [];
+      for (let j = 0; j < Math.min(edgesPerNode, i); j++) {
+        // Connect to earlier nodes, biased toward low index (core banks)
+        const tIdx = (i + j * 7) % i; // deterministic but spread
+        const key = `${ids[i]}-${ids[tIdx]}`;
+        const rev = `${ids[tIdx]}-${ids[i]}`;
+        if (!seen.has(key) && !seen.has(rev)) {
+          seen.add(key);
+          targets.push(tIdx);
+        }
+      }
+      targets.forEach((tIdx) => {
+        const weight = (nodeList[i].total_assets || nodeList[tIdx].total_assets || 500) * 0.03;
+        edges.push({
+          source: ids[i],
+          target: ids[tIdx],
+          weight: Math.round(weight * 100) / 100,
+          type: 'credit',
+        });
+      });
+    }
+    return edges;
+  },
+
   // ─── Actions: Ingest full metrics snapshot (legacy GET /metrics) ───
   ingestMetrics: (data) => {
     // data from GET /metrics (legacy)
@@ -209,6 +242,14 @@ const useSimulationStore = create((set, get) => ({
       default_rates: [...prev.default_rates, metricsUpdate.default_rate].slice(-100),
       system_capital_ratios: [...prev.system_capital_ratios, net.avg_capital_ratio ?? null].slice(-100),
     };
+
+    // ─── Generate edges if store has none ───
+    const currentEdges = get().edges;
+    let edgesUpdate = {};
+    if (currentEdges.length === 0 && nodes.length > 1) {
+      const generated = get()._generateEdgesFromNodes(nodes);
+      edgesUpdate = { edges: generated, layoutComputed: false };
+    }
 
     // ─── Diff previous nodes to generate activity events ───
     const prevNodes = get().nodes;
@@ -327,6 +368,7 @@ const useSimulationStore = create((set, get) => ({
     set({
       timestep: step,
       nodes: nodes.length > 0 ? nodes : get().nodes,
+      ...edgesUpdate,
       bankHistory: newHistory,
       metrics: metricsUpdate,
       timeSeriesHistory: tsUpdate,
@@ -544,6 +586,14 @@ const useSimulationStore = create((set, get) => ({
     const net = data.network_stats || {};
     const mkt = data.market || {};
 
+    // Generate edges if store has none
+    const currentEdges = get().edges;
+    let edgesUpdate = {};
+    if (currentEdges.length === 0 && nodes.length > 1) {
+      const generated = get()._generateEdgesFromNodes(nodes);
+      edgesUpdate = { edges: generated, layoutComputed: false };
+    }
+
     const metricsUpdate = {
       liquidity: mkt.liquidity_index ?? net.avg_capital_ratio ?? null,
       default_rate: net.num_banks > 0 ? (net.num_defaulted ?? 0) / net.num_banks : null,
@@ -563,6 +613,7 @@ const useSimulationStore = create((set, get) => ({
     set({
       timestep: step,
       nodes: nodes.length > 0 ? nodes : get().nodes,
+      ...edgesUpdate,
       bankHistory: newHistory,
       metrics: metricsUpdate,
       timeSeriesHistory: tsUpdate,
