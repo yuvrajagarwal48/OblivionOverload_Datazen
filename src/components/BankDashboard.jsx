@@ -10,10 +10,9 @@ import './BankDashboard.css';
 /**
  * BankDashboard — Restricted view for a single logged-in bank.
  *
- * API mode: fetches from GET /metrics/bank/{id} (legacy)
- *           returns { bank_id, tier, status, balance_sheet, capital_ratio,
- *                     is_solvent, is_liquid, excess_cash, centrality,
- *                     neighbors, creditors, debtors }
+ * API mode: fetches from GET /api/bank/{id}
+ *           returns { bank_id, tier, status, balance_sheet, capital_ratios,
+ *                     credit_risk, network_position, margin_status, flags }
  * Mock mode: reads from store nodes
  */
 export default function BankDashboard() {
@@ -53,10 +52,14 @@ export default function BankDashboard() {
     const storeNode = nodes.find((n) => String(n.id) === String(currentBankId));
     if (!USE_MOCK && bankDetails) {
       const bs = bankDetails.balance_sheet || {};
+      const cr = bankDetails.credit_risk || {};
+      const np = bankDetails.network_position || {};
+      const flags = bankDetails.flags || {};
       return {
         id: String(bankDetails.bank_id),
+        name: storeNode?.name || storeNode?.label || '',
         tier: bankDetails.tier ?? storeNode?.tier,
-        capital_ratio: bankDetails.capital_ratio ?? storeNode?.capital_ratio,
+        capital_ratio: bankDetails.capital_ratios?.current ?? bankDetails.capital_ratio ?? storeNode?.capital_ratio,
         stress: storeNode?.stress ?? 0,
         status: bankDetails.status ?? storeNode?.status,
         cash: bs.cash ?? storeNode?.cash,
@@ -67,11 +70,15 @@ export default function BankDashboard() {
         interbank_assets: bs.interbank_assets ?? storeNode?.interbank_assets ?? {},
         interbank_liabilities: bs.interbank_liabilities ?? storeNode?.interbank_liabilities ?? {},
         debtrank: storeNode?.debtrank ?? 0,
-        // Legacy-specific fields
-        is_solvent: bankDetails.is_solvent,
-        is_liquid: bankDetails.is_liquid,
-        excess_cash: bankDetails.excess_cash,
-        centrality: bankDetails.centrality,
+        // Enriched fields from new API
+        probability_of_default: cr.probability_of_default ?? null,
+        expected_loss: cr.expected_loss ?? null,
+        degree_centrality: np.degree_centrality ?? null,
+        betweenness: np.betweenness_centrality ?? null,
+        is_solvent: flags.is_solvent ?? bankDetails.is_solvent,
+        is_liquid: flags.is_liquid ?? bankDetails.is_liquid,
+        excess_cash: bs.excess_cash ?? bankDetails.excess_cash,
+        centrality: bankDetails.centrality ?? np,
       };
     }
     return storeNode;

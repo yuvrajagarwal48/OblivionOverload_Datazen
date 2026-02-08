@@ -1,58 +1,66 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import useSimulationStore from '../store/simulationStore';
-import { Plus, Trash2, Building2, Shield, TrendingUp } from 'lucide-react';
+import * as api from '../services/api';
+import { Search, Building2, TrendingUp, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import './CustomSetup.css';
 
 /**
- * CustomSetup - Manual configuration for banks, CCPs, and market parameters
+ * CustomSetup - Select real Indian banks from RBI registry + market params
  */
 export default function CustomSetup() {
   const manualConfig = useSimulationStore((s) => s.manualConfig);
   const setManualConfig = useSimulationStore((s) => s.setManualConfig);
   const simStatus = useSimulationStore((s) => s.simStatus);
+  const bankRegistry = useSimulationStore((s) => s.bankRegistry);
+  const registryLoaded = useSimulationStore((s) => s.registryLoaded);
+  const setBankRegistry = useSimulationStore((s) => s.setBankRegistry);
+  const selectedRealBanks = useSimulationStore((s) => s.selectedRealBanks);
+  const toggleRealBank = useSimulationStore((s) => s.toggleRealBank);
+  const clearRealBankSelection = useSimulationStore((s) => s.clearRealBankSelection);
 
   const [activeTab, setActiveTab] = useState('banks');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const isDisabled = simStatus === 'running';
 
-  const addBank = () => {
-    const newBank = {
-      id: `bank_${Date.now()}`,
-      name: `Bank ${manualConfig.banks.length + 1}`,
-      capital: 100,
-      assets: 150,
-      tier: 1,
-    };
-    setManualConfig('banks', [...manualConfig.banks, newBank]);
-  };
+  // Load bank registry on mount
+  const loadRegistry = useCallback(async () => {
+    if (registryLoaded) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await api.getBankRegistry();
+      setBankRegistry(data.banks || []);
+    } catch (err) {
+      console.error('[Registry] Load failed:', err);
+      setError('Could not load bank registry. Is the backend running?');
+    } finally {
+      setLoading(false);
+    }
+  }, [registryLoaded, setBankRegistry]);
 
-  const removeBank = (id) => {
-    setManualConfig('banks', manualConfig.banks.filter(b => b.id !== id));
-  };
+  useEffect(() => {
+    loadRegistry();
+  }, [loadRegistry]);
 
-  const updateBank = (id, field, value) => {
-    setManualConfig('banks', manualConfig.banks.map(b =>
-      b.id === id ? { ...b, [field]: value } : b
-    ));
-  };
+  // Filter banks by search
+  const filteredBanks = bankRegistry.filter((b) =>
+    b.name?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
-  const addCCP = () => {
-    const newCCP = {
-      id: `ccp_${Date.now()}`,
-      name: `CCP ${manualConfig.ccps.length + 1}`,
-      capital: 50,
-      clearing_capacity: 200,
-    };
-    setManualConfig('ccps', [...manualConfig.ccps, newCCP]);
-  };
+  // Group by tier
+  const banksByTier = filteredBanks.reduce((acc, b) => {
+    const tier = b.tier || 3;
+    if (!acc[tier]) acc[tier] = [];
+    acc[tier].push(b);
+    return acc;
+  }, {});
 
-  const removeCCP = (id) => {
-    setManualConfig('ccps', manualConfig.ccps.filter(c => c.id !== id));
-  };
-
-  const updateCCP = (id, field, value) => {
-    setManualConfig('ccps', manualConfig.ccps.map(c =>
-      c.id === id ? { ...c, [field]: value } : c
-    ));
+  const tierLabels = {
+    1: 'Public Sector Banks (SBI & Associates)',
+    2: 'Nationalised Banks',
+    3: 'Private Sector Banks',
   };
 
   const updateMarket = (field, value) => {
@@ -62,8 +70,10 @@ export default function CustomSetup() {
   return (
     <div className="custom-setup">
       <div className="setup-header">
-        <h2 className="setup-title">Custom Setup</h2>
-        <p className="setup-subtitle">Configure banks, CCPs, and market parameters</p>
+        <h2 className="setup-title">Bank Selection</h2>
+        <p className="setup-subtitle">
+          Select real Indian banks from RBI registry ({selectedRealBanks.length} selected)
+        </p>
       </div>
 
       <div className="setup-tabs">
@@ -73,15 +83,7 @@ export default function CustomSetup() {
           disabled={isDisabled}
         >
           <Building2 size={14} />
-          <span>Banks ({manualConfig.banks.length})</span>
-        </button>
-        <button
-          className={`setup-tab ${activeTab === 'ccps' ? 'active' : ''}`}
-          onClick={() => setActiveTab('ccps')}
-          disabled={isDisabled}
-        >
-          <Shield size={14} />
-          <span>CCPs ({manualConfig.ccps.length})</span>
+          <span>Banks ({selectedRealBanks.length})</span>
         </button>
         <button
           className={`setup-tab ${activeTab === 'market' ? 'active' : ''}`}
@@ -97,163 +99,110 @@ export default function CustomSetup() {
         {/* Banks Tab */}
         {activeTab === 'banks' && (
           <div className="setup-section">
+            {/* Search + controls */}
             <div className="section-header">
-              <span className="section-label">Banks Configuration</span>
-              <button
-                className="add-button"
-                onClick={addBank}
-                disabled={isDisabled}
-              >
-                <Plus size={14} />
-                <span>Add Bank</span>
-              </button>
+              <div className="registry-search-box">
+                <Search size={14} className="search-icon" />
+                <input
+                  type="text"
+                  className="registry-search-input"
+                  placeholder="Search banks..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  disabled={isDisabled}
+                />
+              </div>
+              {selectedRealBanks.length > 0 && (
+                <button
+                  className="add-button"
+                  onClick={clearRealBankSelection}
+                  disabled={isDisabled}
+                >
+                  <XCircle size={14} />
+                  <span>Clear All</span>
+                </button>
+              )}
             </div>
 
-            {manualConfig.banks.length === 0 ? (
+            {/* Loading / Error */}
+            {loading && (
               <div className="empty-state">
-                <Building2 size={48} className="empty-icon" />
-                <p>No banks configured</p>
-                <p className="empty-hint">Click "Add Bank" to start</p>
-              </div>
-            ) : (
-              <div className="entity-list">
-                {manualConfig.banks.map((bank) => (
-                  <div key={bank.id} className="entity-card">
-                    <div className="entity-header">
-                      <input
-                        type="text"
-                        className="entity-name-input"
-                        value={bank.name}
-                        onChange={(e) => updateBank(bank.id, 'name', e.target.value)}
-                        disabled={isDisabled}
-                        placeholder="Bank name"
-                      />
-                      <button
-                        className="delete-button"
-                        onClick={() => removeBank(bank.id)}
-                        disabled={isDisabled}
-                        title="Remove bank"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                    <div className="entity-fields">
-                      <div className="field-group">
-                        <label className="field-label">Capital</label>
-                        <input
-                          type="number"
-                          className="field-input"
-                          value={bank.capital}
-                          onChange={(e) => updateBank(bank.id, 'capital', parseFloat(e.target.value) || 0)}
-                          disabled={isDisabled}
-                          min="0"
-                          step="10"
-                        />
-                      </div>
-                      <div className="field-group">
-                        <label className="field-label">Assets</label>
-                        <input
-                          type="number"
-                          className="field-input"
-                          value={bank.assets}
-                          onChange={(e) => updateBank(bank.id, 'assets', parseFloat(e.target.value) || 0)}
-                          disabled={isDisabled}
-                          min="0"
-                          step="10"
-                        />
-                      </div>
-                      <div className="field-group">
-                        <label className="field-label">Tier</label>
-                        <select
-                          className="field-select"
-                          value={bank.tier}
-                          onChange={(e) => updateBank(bank.id, 'tier', parseInt(e.target.value))}
-                          disabled={isDisabled}
-                        >
-                          <option value={1}>Tier 1</option>
-                          <option value={2}>Tier 2</option>
-                          <option value={3}>Tier 3</option>
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                <Loader2 size={48} className="empty-icon spinning" />
+                <p>Loading bank registry...</p>
               </div>
             )}
-          </div>
-        )}
-
-        {/* CCPs Tab */}
-        {activeTab === 'ccps' && (
-          <div className="setup-section">
-            <div className="section-header">
-              <span className="section-label">Central Counterparties</span>
-              <button
-                className="add-button"
-                onClick={addCCP}
-                disabled={isDisabled}
-              >
-                <Plus size={14} />
-                <span>Add CCP</span>
-              </button>
-            </div>
-
-            {manualConfig.ccps.length === 0 ? (
+            {error && (
               <div className="empty-state">
-                <Shield size={48} className="empty-icon" />
-                <p>No CCPs configured</p>
-                <p className="empty-hint">Click "Add CCP" to start</p>
+                <XCircle size={48} className="empty-icon error-icon" />
+                <p>{error}</p>
+                <button className="add-button" onClick={loadRegistry}>
+                  Retry
+                </button>
               </div>
-            ) : (
-              <div className="entity-list">
-                {manualConfig.ccps.map((ccp) => (
-                  <div key={ccp.id} className="entity-card">
-                    <div className="entity-header">
-                      <input
-                        type="text"
-                        className="entity-name-input"
-                        value={ccp.name}
-                        onChange={(e) => updateCCP(ccp.id, 'name', e.target.value)}
-                        disabled={isDisabled}
-                        placeholder="CCP name"
-                      />
-                      <button
-                        className="delete-button"
-                        onClick={() => removeCCP(ccp.id)}
-                        disabled={isDisabled}
-                        title="Remove CCP"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                    <div className="entity-fields">
-                      <div className="field-group">
-                        <label className="field-label">Capital</label>
-                        <input
-                          type="number"
-                          className="field-input"
-                          value={ccp.capital}
-                          onChange={(e) => updateCCP(ccp.id, 'capital', parseFloat(e.target.value) || 0)}
-                          disabled={isDisabled}
-                          min="0"
-                          step="10"
-                        />
-                      </div>
-                      <div className="field-group">
-                        <label className="field-label">Clearing Capacity</label>
-                        <input
-                          type="number"
-                          className="field-input"
-                          value={ccp.clearing_capacity}
-                          onChange={(e) => updateCCP(ccp.id, 'clearing_capacity', parseFloat(e.target.value) || 0)}
-                          disabled={isDisabled}
-                          min="0"
-                          step="10"
-                        />
-                      </div>
-                    </div>
+            )}
+
+            {/* Bank list grouped by tier */}
+            {!loading && !error && Object.entries(banksByTier)
+              .sort(([a], [b]) => Number(a) - Number(b))
+              .map(([tier, banks]) => (
+                <div key={tier} className="registry-tier-group">
+                  <div className="registry-tier-header">
+                    <span className={`tier-badge tier-${tier}`}>Tier {tier}</span>
+                    <span className="registry-tier-label">
+                      {tierLabels[tier] || `Tier ${tier}`} ({banks.length})
+                    </span>
                   </div>
-                ))}
+                  <div className="entity-list">
+                    {banks.map((bank) => {
+                      const isSelected = selectedRealBanks.includes(bank.bank_id);
+                      return (
+                        <div
+                          key={bank.bank_id}
+                          className={`entity-card registry-bank-card ${isSelected ? 'selected' : ''}`}
+                          onClick={() => !isDisabled && toggleRealBank(bank.bank_id)}
+                        >
+                          <div className="entity-header">
+                            <div className="registry-bank-name">
+                              {isSelected ? (
+                                <CheckCircle size={16} className="check-icon selected" />
+                              ) : (
+                                <div className="check-placeholder" />
+                              )}
+                              <span className="bank-name-text">{bank.name}</span>
+                            </div>
+                          </div>
+                          <div className="entity-fields registry-fields">
+                            {bank.crar != null && (
+                              <div className="field-group">
+                                <label className="field-label">CRAR</label>
+                                <span className="field-value">{bank.crar?.toFixed(1)}%</span>
+                              </div>
+                            )}
+                            {bank.net_npa_ratio != null && (
+                              <div className="field-group">
+                                <label className="field-label">Net NPA</label>
+                                <span className="field-value">{bank.net_npa_ratio?.toFixed(2)}%</span>
+                              </div>
+                            )}
+                            {bank.total_assets != null && (
+                              <div className="field-group">
+                                <label className="field-label">Assets</label>
+                                <span className="field-value">₹{(bank.total_assets / 1000).toFixed(0)}K Cr</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))
+            }
+
+            {!loading && !error && filteredBanks.length === 0 && searchQuery && (
+              <div className="empty-state">
+                <Search size={48} className="empty-icon" />
+                <p>No banks match "{searchQuery}"</p>
               </div>
             )}
           </div>

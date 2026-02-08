@@ -8,11 +8,11 @@ import * as api from '../services/api';
  * Simulation lifecycle controller.
  *
  * USE_MOCK=true  → mock engine (no backend)
- * USE_MOCK=false → real FastAPI backend (legacy endpoints) with polling loop
+ * USE_MOCK=false → real FastAPI backend with polling loop
  *
- * Legacy endpoints used:
- *   POST /simulation/init, /simulation/step, /simulation/reset
- *   GET  /metrics (full state), /metrics/risk (DebtRank), /network/topology (graph)
+ * Uses new modular endpoints:
+ *   POST /api/simulation/init, /api/simulation/step
+ *   GET  /api/simulation/state (full state), /metrics/risk (DebtRank), /network/topology (graph)
  */
 export default function useSimulationControl() {
   const setSimStatus = useSimulationStore((s) => s.setSimStatus);
@@ -27,6 +27,7 @@ export default function useSimulationControl() {
   const customConfig = useSimulationStore((s) => s.customConfig);
   const manualConfig = useSimulationStore((s) => s.manualConfig);
   const useManualSetup = useSimulationStore((s) => s.useManualSetup);
+  const selectedRealBanks = useSimulationStore((s) => s.selectedRealBanks);
   const setNodeDecision = useSimulationStore((s) => s.setNodeDecision);
 
   // API-mode state
@@ -34,33 +35,41 @@ export default function useSimulationControl() {
   const setApiError = useSimulationStore((s) => s.setApiError);
   const setBackendInitialized = useSimulationStore((s) => s.setBackendInitialized);
   const ingestMetrics = useSimulationStore((s) => s.ingestMetrics);
+  const ingestSimulationState = useSimulationStore((s) => s.ingestSimulationState);
   const ingestEdges = useSimulationStore((s) => s.ingestEdges);
   const ingestTopologyNodes = useSimulationStore((s) => s.ingestTopologyNodes);
   const ingestStepResult = useSimulationStore((s) => s.ingestStepResult);
   const ingestRiskMetrics = useSimulationStore((s) => s.ingestRiskMetrics);
+  const setBankNameMap = useSimulationStore((s) => s.setBankNameMap);
 
   // Polling ref
   const pollRef = useRef(null);
 
-  // ─── Fetch full state from backend (legacy endpoints) ───
+  // ─── Fetch full state from backend ───
   const fetchFullState = useCallback(async () => {
     try {
-      const [metricsRes, topoRes, riskRes] = await Promise.allSettled([
-        api.getMetrics(),
+      // Primary: new /api/simulation/state (has bank names, exchange/CCP data)
+      // Fallback: legacy /metrics if new endpoint fails
+      const [stateRes, topoRes, riskRes] = await Promise.allSettled([
+        api.getSimulationState().catch(() => api.getMetrics()),
         api.getNetworkTopology(),
         api.getRiskMetrics(),
       ]);
 
-      if (metricsRes.status === 'fulfilled') {
-        ingestMetrics(metricsRes.value);
+      if (stateRes.status === 'fulfilled') {
+        const data = stateRes.value;
+        // New format has 'timestep' and 'network_stats', legacy has 'step' and 'network'
+        if (data.network_stats !== undefined) {
+          ingestSimulationState(data);
+        } else {
+          ingestMetrics(data);
+        }
       }
       if (topoRes.status === 'fulfilled') {
         if (topoRes.value.edges) ingestEdges(topoRes.value.edges);
-        // Ingest topology nodes (may include CCP nodes)
         if (topoRes.value.nodes) {
           ingestTopologyNodes(topoRes.value.nodes);
-          // If metrics fetch failed, also populate basic bank data from topology
-          if (metricsRes.status !== 'fulfilled') {
+          if (stateRes.status !== 'fulfilled') {
             ingestMetrics({ banks: Object.fromEntries(topoRes.value.nodes.map(n => [n.id, n])), step: 0 });
           }
         }
@@ -71,7 +80,7 @@ export default function useSimulationControl() {
     } catch (err) {
       console.error('[API] fetchFullState error:', err);
     }
-  }, [ingestMetrics, ingestEdges, ingestTopologyNodes, ingestRiskMetrics]);
+  }, [ingestMetrics, ingestSimulationState, ingestEdges, ingestTopologyNodes, ingestRiskMetrics]);
 
   // ─── Poll loop: step + fetch state ───
   const startPolling = useCallback(() => {
@@ -83,8 +92,8 @@ export default function useSimulationControl() {
         const stepResult = await api.stepSimulation();
         ingestStepResult(stepResult);
 
-        // Check if done
-        if (stepResult.done) {
+        // Check if done (new: is_done, legacy: done)
+        if (stepResult.is_done || stepResult.done) {
           stopPolling();
           setSimStatus('done');
           await fetchFullState();
@@ -152,49 +161,49 @@ export default function useSimulationControl() {
 
     setApiLoading(true);
     try {
-      // Build config from manual setup or use defaults
-      const numBanksFromConfig = manualConfig.banks.length > 0 ? manualConfig.banks.length : 10;
-      
-      const initConfig = useManualSetup ? {
-        num_banks: numBanksFromConfig,
-        episode_length: manualConfig.market.episode_length || 100,
-        scenario: 'custom',
-        banks: manualConfig.banks.length > 0 ? manualConfig.banks : undefined,
-        ccps: manualConfig.ccps.length > 0 ? manualConfig.ccps : undefined,
-        market: manualConfig.market,
-      } : {
-        num_banks: 5,
-        episode_length: 100,
-        scenario: 'normal',
-      };
+      let initConfig;
+
+      if (useManualSetup && selectedRealBanks.length > 0) {
+        // ── Real bank mode: use bank_ids from registry ──
+        initConfig = {
+          bank_ids: selectedRealBanks,
+          num_banks: selectedRealBanks.length,
+          episode_length: manualConfig.market.episode_length || 100,
+          scenario: scenario || 'normal',
+        };
+      } else if (useManualSetup) {
+        // ── Manual config mode (no real banks selected) ──
+        initConfig = {
+          num_banks: manualConfig.banks.length > 0 ? manualConfig.banks.length : 10,
+          episode_length: manualConfig.market.episode_length || 100,
+          scenario: 'custom',
+        };
+      } else {
+        // ── Scenario-only mode (random banks) ──
+        initConfig = {
+          num_banks: 10,
+          episode_length: 100,
+          scenario: scenario || 'normal',
+        };
+      }
 
       console.log('[API] Initializing with config:', initConfig);
 
-      // Initialize simulation via legacy endpoint
-      await api.initSimulation(initConfig);
+      // Initialize simulation
+      const initResult = await api.initSimulation(initConfig);
       setBackendInitialized(true);
+
+      // Build name map from init response bank list
+      if (initResult.banks && Array.isArray(initResult.banks)) {
+        const nameMap = {};
+        initResult.banks.forEach((b) => {
+          nameMap[String(b.id)] = b.name;
+        });
+        setBankNameMap(nameMap);
+      }
 
       // Fetch initial state
       await fetchFullState();
-
-      // If manual setup has CCPs, inject them as nodes if backend didn't
-      if (useManualSetup && manualConfig.ccps.length > 0) {
-        const currentNodes = useSimulationStore.getState().nodes;
-        const ccpNodes = manualConfig.ccps
-          .filter(ccp => !currentNodes.find(n => String(n.id) === String(ccp.id)))
-          .map(ccp => ({
-            id: ccp.id,
-            label: ccp.name || `CCP-${ccp.id}`,
-            node_type: 'ccp',
-            tier: 0,
-            capital_ratio: 1.0,
-            stress: 0,
-            status: 'active',
-          }));
-        if (ccpNodes.length > 0) {
-          ingestTopologyNodes([...currentNodes, ...ccpNodes]);
-        }
-      }
 
       setSimStatus('running');
       setApiLoading(false);
@@ -211,7 +220,7 @@ export default function useSimulationControl() {
       return false;
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedScenario, useManualSetup, manualConfig, setSimStatus, setApiLoading, setApiError, setBackendInitialized, fetchFullState, startPolling]);
+  }, [selectedScenario, useManualSetup, selectedRealBanks, manualConfig, setSimStatus, setApiLoading, setApiError, setBackendInitialized, setBankNameMap, fetchFullState, startPolling]);
 
   // ─── Play ───
   const play = useCallback(async () => {

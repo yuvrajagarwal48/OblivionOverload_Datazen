@@ -77,6 +77,15 @@ const useSimulationStore = create((set, get) => ({
   selectedBanks: [],
   bankViewOpen: false,
 
+  // ─── Bank Registry (real Indian banks from RBI data) ───
+  bankRegistry: [],        // Full list from /api/bank/registry
+  registryLoaded: false,
+  selectedRealBanks: [],   // Array of bank_id ints selected for simulation
+  registrySearchResults: [],
+
+  // ─── Bank Name Map (populated after init from real banks) ───
+  bankNameMap: {},         // { [simId]: "State Bank of India" }
+
   // ─── Manual Configuration (Custom Setup) ───
   manualConfig: {
     banks: [],
@@ -122,6 +131,20 @@ const useSimulationStore = create((set, get) => ({
   clearApiError: () => set({ apiError: null }),
   setBackendInitialized: (val) => set({ backendInitialized: val }),
 
+  // ─── Actions: Bank Registry ───
+  setBankRegistry: (banks) => set({ bankRegistry: banks, registryLoaded: true }),
+  setRegistrySearchResults: (results) => set({ registrySearchResults: results }),
+  toggleRealBank: (bankId) => {
+    set((state) => {
+      const selected = state.selectedRealBanks.includes(bankId)
+        ? state.selectedRealBanks.filter((id) => id !== bankId)
+        : [...state.selectedRealBanks, bankId];
+      return { selectedRealBanks: selected };
+    });
+  },
+  clearRealBankSelection: () => set({ selectedRealBanks: [] }),
+  setBankNameMap: (map) => set({ bankNameMap: map }),
+
   // ─── Actions: Ingest full metrics snapshot (legacy GET /metrics) ───
   ingestMetrics: (data) => {
     // data from GET /metrics (legacy)
@@ -132,6 +155,7 @@ const useSimulationStore = create((set, get) => ({
 
     // Convert banks dict → nodes array
     const banks = data.banks || {};
+    const nameMap = get().bankNameMap;
     const nodes = Object.entries(banks).map(([bankId, b]) => {
       const id = String(bankId);
       const entry = {
@@ -145,14 +169,16 @@ const useSimulationStore = create((set, get) => ({
 
       return {
         id,
+        label: b.name || nameMap[id] || `Bank ${id}`,
+        name: b.name || nameMap[id] || '',
         tier: b.tier ?? 2,
         capital_ratio: b.capital_ratio ?? 0,
         stress: 0,
         status: b.status ?? 'active',
         cash: b.cash ?? 0,
         equity: b.equity ?? 0,
-        total_assets: 0,
-        total_liabilities: 0,
+        total_assets: b.total_assets ?? 0,
+        total_liabilities: b.total_liabilities ?? 0,
         illiquid_assets: 0,
         external_liabilities: 0,
         interbank_assets: {},
@@ -194,6 +220,7 @@ const useSimulationStore = create((set, get) => ({
       const prev = prevNodeMap[n.id];
       if (!prev) return; // first snapshot, no diff
 
+      const bName = n.label || n.name || `Bank ${n.id}`;
       const cashDelta = (n.cash ?? 0) - (prev.cash ?? 0);
       const equityDelta = (n.equity ?? 0) - (prev.equity ?? 0);
       const crDelta = (n.capital_ratio ?? 0) - (prev.capital_ratio ?? 0);
@@ -205,7 +232,7 @@ const useSimulationStore = create((set, get) => ({
           timestep: step,
           type: 'DEFAULT',
           icon: '💀',
-          message: `Bank ${n.id} DEFAULTED`,
+          message: `${bName} DEFAULTED`,
           detail: `Capital ratio fell to ${(n.capital_ratio * 100).toFixed(1)}%`,
           color: '#ef4444',
           bankId: n.id,
@@ -218,7 +245,7 @@ const useSimulationStore = create((set, get) => ({
           timestep: step,
           type: 'LEND',
           icon: '💸',
-          message: `Bank ${n.id} LENT ₹${Math.abs(cashDelta).toFixed(0)}`,
+          message: `${bName} LENT ₹${Math.abs(cashDelta).toFixed(0)}`,
           detail: `Cash: ${prev.cash?.toFixed(0)} → ${n.cash?.toFixed(0)} | CR: ${(n.capital_ratio * 100).toFixed(1)}%`,
           color: '#10b981',
           bankId: n.id,
@@ -231,7 +258,7 @@ const useSimulationStore = create((set, get) => ({
           timestep: step,
           type: 'BORROW',
           icon: '🏦',
-          message: `Bank ${n.id} BORROWED ₹${cashDelta.toFixed(0)}`,
+          message: `${bName} BORROWED ₹${cashDelta.toFixed(0)}`,
           detail: `Cash: ${prev.cash?.toFixed(0)} → ${n.cash?.toFixed(0)} | CR: ${(n.capital_ratio * 100).toFixed(1)}%`,
           color: '#3b82f6',
           bankId: n.id,
@@ -244,7 +271,7 @@ const useSimulationStore = create((set, get) => ({
           timestep: step,
           type: 'FIRE_SALE',
           icon: '🔥',
-          message: `Bank ${n.id} FIRE SALE`,
+          message: `${bName} FIRE SALE`,
           detail: `Equity: ${prev.equity?.toFixed(0)} → ${n.equity?.toFixed(0)} (Δ${equityDelta.toFixed(0)})`,
           color: '#f59e0b',
           bankId: n.id,
@@ -257,7 +284,7 @@ const useSimulationStore = create((set, get) => ({
           timestep: step,
           type: 'HOARD',
           icon: '🔒',
-          message: `Bank ${n.id} HOARDING`,
+          message: `${bName} HOARDING`,
           detail: `CR: ${(prev.capital_ratio * 100).toFixed(1)}% → ${(n.capital_ratio * 100).toFixed(1)}%`,
           color: '#f59e0b',
           bankId: n.id,
@@ -270,7 +297,7 @@ const useSimulationStore = create((set, get) => ({
           timestep: step,
           type: 'STRESSED',
           icon: '⚠️',
-          message: `Bank ${n.id} under stress`,
+          message: `${bName} under stress`,
           detail: `CR: ${(prev.capital_ratio * 100).toFixed(1)}% → ${(n.capital_ratio * 100).toFixed(1)}% (Δ${(crDelta * 100).toFixed(1)}%)`,
           color: '#f97316',
           bankId: n.id,
@@ -477,16 +504,90 @@ const useSimulationStore = create((set, get) => ({
 
   // (ingestMarketState and ingestTimeSeries removed — data now flows through ingestMetrics)
 
-  // ─── Ingest step result metrics (legacy POST /simulation/step) ───
+  // ─── Ingest full state from GET /api/simulation/state ───
+  ingestSimulationState: (data) => {
+    // data = { timestep, market, network_stats, banks, exchanges, ccps }
+    const step = data.timestep ?? get().timestep;
+    const nameMap = get().bankNameMap;
+    const prevHistory = get().bankHistory;
+    const newHistory = { ...prevHistory };
+
+    const banks = data.banks || {};
+    const nodes = Object.entries(banks).map(([bankId, b]) => {
+      const id = String(bankId);
+      const entry = {
+        timestep: step,
+        capital_ratio: b.capital_ratio ?? 0,
+        stress: 0,
+        status: b.status ?? 'active',
+      };
+      if (!newHistory[id]) newHistory[id] = [];
+      newHistory[id] = [...newHistory[id].slice(-49), entry];
+
+      return {
+        id,
+        label: b.name || nameMap[id] || `Bank ${id}`,
+        name: b.name || nameMap[id] || '',
+        tier: b.tier ?? 2,
+        capital_ratio: b.capital_ratio ?? 0,
+        stress: 0,
+        status: b.status ?? 'active',
+        cash: b.cash ?? 0,
+        equity: b.equity ?? 0,
+        total_assets: b.total_assets ?? 0,
+        total_liabilities: b.total_liabilities ?? 0,
+        debtrank: 0,
+        last_updated_timestep: step,
+      };
+    });
+
+    const net = data.network_stats || {};
+    const mkt = data.market || {};
+
+    const metricsUpdate = {
+      liquidity: mkt.liquidity_index ?? net.avg_capital_ratio ?? null,
+      default_rate: net.num_banks > 0 ? (net.num_defaulted ?? 0) / net.num_banks : null,
+      equilibrium_score: net.avg_capital_ratio ? Math.min(1, net.avg_capital_ratio / 0.15) : null,
+      volatility: mkt.volatility ?? null,
+    };
+
+    const prev = get().timeSeriesHistory;
+    const tsUpdate = {
+      market_prices: [...prev.market_prices, mkt.asset_price ?? null].slice(-100),
+      interest_rates: [...prev.interest_rates, mkt.interest_rate ?? null].slice(-100),
+      liquidity_indices: [...prev.liquidity_indices, mkt.liquidity_index ?? null].slice(-100),
+      default_rates: [...prev.default_rates, metricsUpdate.default_rate].slice(-100),
+      system_capital_ratios: [...prev.system_capital_ratios, net.avg_capital_ratio ?? null].slice(-100),
+    };
+
+    set({
+      timestep: step,
+      nodes: nodes.length > 0 ? nodes : get().nodes,
+      bankHistory: newHistory,
+      metrics: metricsUpdate,
+      timeSeriesHistory: tsUpdate,
+      advancedMetrics: {
+        ...get().advancedMetrics,
+        network_density: net.density ?? get().advancedMetrics.network_density,
+        clustering_coefficient: net.clustering_coefficient ?? get().advancedMetrics.clustering_coefficient,
+        market_price: mkt.asset_price ?? get().advancedMetrics.market_price,
+        interest_rate: mkt.interest_rate ?? get().advancedMetrics.interest_rate,
+        liquidity_index: mkt.liquidity_index ?? get().advancedMetrics.liquidity_index,
+      },
+    });
+  },
+
+  // ─── Ingest step result metrics (from POST /api/simulation/step) ───
   ingestStepResult: (result) => {
-    // result from POST /simulation/step (legacy)
-    // { step, rewards, done, network_stats: {num_banks, num_defaulted, ...}, market_state: {asset_price, ...} }
+    // New format: { steps_completed, current_step, is_done, rewards, network_stats, market_state, infrastructure }
+    // Legacy format: { step, rewards, done, network_stats, market_state }
     const m = result.network_stats || {};
     const mkt = result.market_state || {};
     const numBanks = m.num_banks || 30;
+    const step = result.current_step ?? result.step ?? get().timestep;
 
     set({
-      timestep: result.step ?? get().timestep,
+      timestep: step,
       metrics: {
         liquidity: mkt.liquidity_index ?? m.avg_capital_ratio ?? null,
         default_rate: numBanks > 0 ? (m.num_defaulted ?? 0) / numBanks : null,
@@ -632,7 +733,7 @@ const useSimulationStore = create((set, get) => ({
         currentBankId: String(bankId),
         currentBankData: {
           bank_id: bankNode.id,
-          name: bankNode.label || `Bank ${bankNode.id}`,
+          name: bankNode.name || bankNode.label || `Bank ${bankNode.id}`,
           tier: bankNode.tier,
           node_type: bankNode.node_type || 'bank',
         },
@@ -657,6 +758,8 @@ const useSimulationStore = create((set, get) => ({
       apiLoading: false,
       apiError: null,
       backendInitialized: false,
+      selectedRealBanks: [],
+      bankNameMap: {},
       nodes: [],
       edges: [],
       events: [],
@@ -727,6 +830,8 @@ const useSimulationStore = create((set, get) => ({
       apiLoading: false,
       apiError: null,
       backendInitialized: false,
+      selectedRealBanks: [],
+      bankNameMap: {},
       nodes: [],
       edges: [],
       events: [],

@@ -338,3 +338,145 @@
   color: var(--text-tertiary);
   line-height: 1.4;
 }
+
+/* ─── Bank Registry Styles ─── */
+
+.registry-search-box {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  padding: 6px 10px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-secondary);
+  border-radius: 4px;
+  transition: border-color 0.2s;
+}
+
+.registry-search-box:focus-within {
+  border-color: #3b82f6;
+}
+
+.search-icon {
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+.registry-search-input {
+  flex: 1;
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+}
+
+.registry-search-input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.registry-tier-group {
+  margin-bottom: 16px;
+}
+
+.registry-tier-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border-secondary);
+}
+
+.tier-badge {
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.tier-badge.tier-1 { background: #dbeafe; color: #1d4ed8; }
+.tier-badge.tier-2 { background: #dcfce7; color: #16a34a; }
+.tier-badge.tier-3 { background: #fef3c7; color: #d97706; }
+
+.registry-tier-label {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  font-weight: 600;
+}
+
+.registry-bank-card {
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.2s;
+  padding: 10px 12px;
+}
+
+.registry-bank-card:hover {
+  border-color: #3b82f6;
+  background: var(--bg-hover, rgba(59, 130, 246, 0.05));
+}
+
+.registry-bank-card.selected {
+  border-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.08);
+  box-shadow: 0 0 0 1px #3b82f6;
+}
+
+.registry-bank-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.check-icon {
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+.check-icon.selected {
+  color: #3b82f6;
+}
+
+.check-placeholder {
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid var(--border-secondary);
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.bank-name-text {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.registry-fields {
+  margin-top: 4px;
+  padding-left: 24px;
+}
+
+.field-value {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.error-icon {
+  color: #ef4444;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.spinning {
+  animation: spin 1s linear infinite;
+}

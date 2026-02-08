@@ -64,6 +64,19 @@ function InspectorPanel() {
     }
   };
 
+  const getBankLabel = (node) => node.name || node.label || `Bank ${node.id}`;
+  const getBankShortLabel = (node) => {
+    if (node.name) {
+      // Abbreviate long names: "State Bank of India" → "SBI" or first 12 chars
+      const words = node.name.split(' ');
+      if (words.length >= 3 && node.name.length > 15) {
+        return words.map(w => w[0]).join('').toUpperCase();
+      }
+      return node.name.length > 14 ? node.name.slice(0, 12) + '…' : node.name;
+    }
+    return node.label || `B${node.id}`;
+  };
+
   // Group banks by tier
   const banksByTier = nodes.reduce((acc, node) => {
     const tier = node.tier || 3;
@@ -97,16 +110,16 @@ function InspectorPanel() {
                   key={node.id}
                   className={`inspector-login-btn ${String(node.id) === String(currentBankId) ? 'active' : ''}`}
                   onClick={() => loginAsBank(String(node.id))}
-                  title={`Login as ${node.label || `Bank ${node.id}`}`}
+                  title={`Login as ${getBankLabel(node)}`}
                 >
                   <LogIn size={12} />
-                  <span>{node.label || `B${node.id}`}</span>
+                  <span>{getBankShortLabel(node)}</span>
                 </button>
               ))}
           </div>
           {currentBankId && (
             <div className="inspector-current-bank">
-              ✅ Viewing as: <strong>{nodes.find(n => String(n.id) === String(currentBankId))?.label || `Bank ${currentBankId}`}</strong>
+              ✅ Viewing as: <strong>{getBankLabel(nodes.find(n => String(n.id) === String(currentBankId)) || { id: currentBankId })}</strong>
             </div>
           )}
         </div>
@@ -128,7 +141,7 @@ function InspectorPanel() {
                   <div className="bank-card-header">
                     <div className="bank-card-id">
                       <span className={`bank-status-dot status-${bank.status || 'active'}`}></span>
-                      {bank.label || `Bank ${bank.id}`}
+                      {getBankLabel(bank)}
                     </div>
                     <button
                       onClick={() => deselectBank(bankId)}
@@ -220,7 +233,7 @@ function InspectorPanel() {
                 >
                   <div className="bank-item-left">
                     <span className={`bank-status-dot status-${bank.status || 'active'}`}></span>
-                    <span className="bank-item-label">{bank.label || `Bank ${bank.id}`}</span>
+                    <span className="bank-item-label">{getBankLabel(bank)}</span>
                   </div>
                   <div className="bank-item-right">
                     <span 

@@ -58,10 +58,10 @@ export default function ScenarioSelector() {
           className="manual-setup-btn"
           onClick={() => setUseManualSetup(true)}
           disabled={isDisabled}
-          title="Switch to manual setup"
+          title="Select real Indian banks from RBI registry"
         >
           <Settings size={16} />
-          <span>Manual Setup</span>
+          <span>Select Real Banks</span>
         </button>
       </div>
 

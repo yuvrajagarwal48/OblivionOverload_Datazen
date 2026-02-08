@@ -1,17 +1,9 @@
 /**
  * API Service Layer for FinSim-MAPPO
  *
- * Uses the LEGACY endpoints defined directly in main.py (no /api prefix).
- * These use the simpler SimulationState that works without bugs.
- *
- * Legacy endpoints:
- *   POST /simulation/init, /simulation/reset, /simulation/step, /simulation/run
- *   GET  /metrics, /metrics/risk, /metrics/bank/{id}
- *   GET  /network/topology
- *   GET  /scenarios, POST /scenarios/set, POST /scenarios/shock
- *   POST /what_if
- *   GET  /recommendations/{bankId}
- *   GET  /health
+ * Unified layer:
+ *   - New modular: /api/simulation/*, /api/bank/*, /api/bank/registry
+ *   - Legacy fallbacks: /metrics, /metrics/risk, /network/topology, /what_if
  */
 
 import { API_BASE_URL } from '../config';
@@ -36,34 +28,46 @@ const post = (path, body) =>
   request(path, { method: 'POST', body: body != null ? JSON.stringify(body) : undefined });
 
 // ═══════════════════════════════════════════════════════════════
+// BANK REGISTRY (real banks from RBI data — no init required)
+// ═══════════════════════════════════════════════════════════════
+
+/** GET /api/bank/registry — all 46 real Indian banks with metadata */
+export const getBankRegistry = () => get('/api/bank/registry');
+
+/** GET /api/bank/registry/search?q=... — search banks by name */
+export const searchBankRegistry = (query) =>
+  get(`/api/bank/registry/search?q=${encodeURIComponent(query)}`);
+
+/** GET /api/bank/registry/{id} — single bank detail from registry */
+export const getRegistryBank = (bankId) => get(`/api/bank/registry/${bankId}`);
+
+// ═══════════════════════════════════════════════════════════════
 // SIMULATION CONTROL
 // ═══════════════════════════════════════════════════════════════
 
-/** POST /simulation/init — initialize environment + agents */
+/**
+ * POST /api/simulation/init — initialize with real/synthetic banks.
+ * Supports: bank_ids (real), bank_names (real), synthetic_count, num_banks (random fallback)
+ */
 export const initSimulation = (config = {}) =>
-  post('/simulation/init', {
-    num_banks: config.num_banks ?? 5,
+  post('/api/simulation/init', {
+    bank_ids: config.bank_ids ?? undefined,
+    bank_names: config.bank_names ?? undefined,
+    synthetic_count: config.synthetic_count ?? undefined,
+    synthetic_stress: config.synthetic_stress ?? undefined,
+    num_banks: config.num_banks ?? 10,
     episode_length: config.episode_length ?? 100,
     scenario: config.scenario ?? 'normal',
     seed: config.seed ?? null,
-    banks: config.banks ?? undefined,
-    ccps: config.ccps ?? undefined,
-    market: config.market ?? undefined,
   });
 
-/** POST /simulation/reset */
+/** POST /simulation/reset (legacy) */
 export const resetSimulation = () => post('/simulation/reset');
 
-/**
- * POST /simulation/step — execute one step.
- * Response: { step, rewards, done, network_stats, market_state }
- */
-export const stepSimulation = () => post('/simulation/step');
+/** POST /api/simulation/step — execute one step */
+export const stepSimulation = () => post('/api/simulation/step');
 
-/**
- * POST /simulation/run?num_steps=N — run multiple steps at once.
- * Response: { steps_completed, total_rewards, final_step, network_stats }
- */
+/** POST /simulation/run?num_steps=N (legacy) */
 export const runSimulation = (numSteps = 100) =>
   post(`/simulation/run?num_steps=${numSteps}`);
 
@@ -71,119 +75,75 @@ export const runSimulation = (numSteps = 100) =>
 // STATE & METRICS
 // ═══════════════════════════════════════════════════════════════
 
-/**
- * GET /metrics — full current state snapshot.
- * Response: { step, network, market, banks, scenario }
- */
+/** GET /api/simulation/state — full state snapshot (banks with names, market, network) */
+export const getSimulationState = () => get('/api/simulation/state');
+
+/** GET /api/simulation/status — quick status summary */
+export const getSimulationStatus = () => get('/api/simulation/status');
+
+/** GET /metrics — legacy full state (fallback) */
 export const getMetrics = () => get('/metrics');
 
-/** GET /metrics/risk — comprehensive risk analysis (DebtRank etc). */
+/** GET /metrics/risk — comprehensive risk analysis (DebtRank etc.) */
 export const getRiskMetrics = () => get('/metrics/risk');
 
-/**
- * GET /metrics/bank/{id} — detailed bank info.
- * Response: { bank_id, tier, status, balance_sheet, capital_ratio,
- *             is_solvent, is_liquid, excess_cash, centrality, neighbors, creditors, debtors }
- */
-export const getBankDetails = (bankId) => get(`/metrics/bank/${bankId}`);
+/** GET /metrics/bank/{id} — legacy detailed bank info */
+export const getLegacyBankDetails = (bankId) => get(`/metrics/bank/${bankId}`);
 
 // ═══════════════════════════════════════════════════════════════
-// BANK ENDPOINTS (from ai branch API)
+// BANK ENDPOINTS
 // ═══════════════════════════════════════════════════════════════
 
-/**
- * GET /api/bank/{bank_id}/history — time series of bank metrics.
- * Query params: start, end
- * Response: { bank_id, count, timesteps, data, series }
- */
+/** GET /api/bank/ — all banks with names, metadata, risk scores */
+export const listBanks = () => get('/api/bank/');
+
+/** GET /api/bank/{id} — full bank detail (balance sheet, credit risk, network, margins) */
+export const getBankDetails = (bankId) => get(`/api/bank/${bankId}`);
+
+/** GET /api/bank/{id}/history — time series */
 export const getBankHistory = (bankId, start = 0, end = null) => {
   const params = new URLSearchParams({ start: start.toString() });
   if (end !== null) params.append('end', end.toString());
   return get(`/api/bank/${bankId}/history?${params}`);
 };
 
-/**
- * GET /api/bank/{bank_id}/transactions — transaction history.
- * Query params: limit, tx_type
- * Response: { bank_id, count, transactions, summary }
- */
+/** GET /api/bank/{id}/transactions */
 export const getBankTransactions = (bankId, limit = 100, txType = null) => {
   const params = new URLSearchParams({ limit: limit.toString() });
   if (txType) params.append('tx_type', txType);
   return get(`/api/bank/${bankId}/transactions?${params}`);
 };
 
-/**
- * GET /api/bank/{bank_id}/exposures — detailed exposure breakdown.
- * Response: { bank_id, assets, liabilities, summary }
- */
+/** GET /api/bank/{id}/exposures */
 export const getBankExposures = (bankId) => get(`/api/bank/${bankId}/exposures`);
 
-/**
- * GET /api/bank/ — list all banks with summary.
- * Response: { count, banks, summary }
- */
-export const listBanks = () => get('/api/bank/');
-
-/**
- * GET /api/bank/stressed — get stressed/critical banks.
- * Response: { stressed, critical, defaulted, summary }
- */
+/** GET /api/bank/stressed */
 export const getStressedBanks = () => get('/api/bank/stressed');
 
 // ═══════════════════════════════════════════════════════════════
 // NETWORK
 // ═══════════════════════════════════════════════════════════════
 
-/**
- * GET /network/topology — nodes + edges for graph visualization.
- * Response: { nodes, edges, stats }
- */
+/** GET /network/topology — nodes + edges for graph (legacy) */
 export const getNetworkTopology = () => get('/network/topology');
 
 // ═══════════════════════════════════════════════════════════════
-// SCENARIOS & SHOCKS
+// SCENARIOS & SHOCKS (legacy)
 // ═══════════════════════════════════════════════════════════════
 
-/** GET /scenarios */
 export const listScenarios = () => get('/scenarios');
-
-/** POST /scenarios/set */
 export const setScenario = (scenarioName) =>
   post('/scenarios/set', { scenario_name: scenarioName });
-
-/** POST /scenarios/shock */
 export const applyShock = (shock) => post('/scenarios/shock', shock);
 
 // ═══════════════════════════════════════════════════════════════
 // WHAT-IF & RECOMMENDATIONS
 // ═══════════════════════════════════════════════════════════════
 
-/**
- * POST /api/whatif/analyze — comprehensive what-if transaction analysis.
- * Body: {
- *   transaction_type: string,  // 'loan_approval', 'margin_increase', 'borrow', 'sell_assets'
- *   initiator_id: int,
- *   counterparty_id: int (optional),
- *   amount: float,
- *   interest_rate: float (default 0.05),
- *   duration: int (default 10),
- *   collateral: float (default 0),
- *   horizon: int (default 10),
- *   num_simulations: int (default 20)
- * }
- * Response: {
- *   analysis_id, transaction, baseline, counterfactual, deltas,
- *   risk_assessment, recommendation, simulation_info
- * }
- */
+/** POST /api/whatif/analyze — comprehensive what-if analysis */
 export const analyzeTransaction = (payload) => post('/api/whatif/analyze', payload);
 
-/**
- * GET /api/whatif/quick-check/{bank_id} — quick risk check.
- * Query params: amount, transaction_type
- * Response: { bank_id, current_state, post_transaction, assessment }
- */
+/** GET /api/whatif/quick-check/{bank_id} */
 export const quickRiskCheck = (bankId, amount, transactionType = 'loan_approval') => {
   const params = new URLSearchParams({
     amount: amount.toString(),
@@ -192,18 +152,11 @@ export const quickRiskCheck = (bankId, amount, transactionType = 'loan_approval'
   return get(`/api/whatif/quick-check/${bankId}?${params}`);
 };
 
-/** POST /what_if — LEGACY endpoint (basic action vector) */
+/** POST /what_if — legacy action vector */
 export const whatIf = (payload) => post('/what_if', payload);
 
 /** GET /recommendations/{bankId} */
 export const getRecommendation = (bankId) => get(`/recommendations/${bankId}`);
-
-/** GET /recommendations — all banks */
-export const getAllRecommendations = () => get('/recommendations');
-
-// ═══════════════════════════════════════════════════════════════
-// HEALTH
-// ═══════════════════════════════════════════════════════════════
 
 /** GET /health */
 export const healthCheck = () => get('/health');
